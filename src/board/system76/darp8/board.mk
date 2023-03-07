@@ -4,6 +4,8 @@ EC=it5570e
 
 # Enable eSPI
 CFLAGS+=-DEC_ESPI=1
+# Apply PMC hack for S0ix
+CFLAGS+=-DPMC_S0IX_HACK=1
 
 # Use S0ix
 CFLAGS+=-DUSE_S0IX=1
