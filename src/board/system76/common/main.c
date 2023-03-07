@@ -25,6 +25,7 @@
 #include <board/pwm.h>
 #include <board/smbus.h>
 #include <board/smfi.h>
+#include <board/typec.h>
 #include <common/debug.h>
 #include <common/macro.h>
 #include <common/version.h>
@@ -76,6 +77,7 @@ void init(void) {
     pmc_init();
     pwm_init();
     smbus_init();
+    typec_init();
     smfi_init();
     ps2_init();
 

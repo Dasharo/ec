@@ -23,6 +23,9 @@ CFLAGS+=-DI2C_SMBUS=I2C_4
 # Set touchpad PS2 bus
 CFLAGS+=-DPS2_TOUCHPAD=PS2_3
 
+# Set Type-C controller I2C bus
+CFLAGS+=-DI2C_TYPEC=I2C_1
+
 # Set smart charger parameters
 # TODO: actually bq24800
 # FIXME: Verify parts and values.

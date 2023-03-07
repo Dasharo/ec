@@ -14,6 +14,7 @@
 #include <board/power.h>
 #include <board/pmc.h>
 #include <board/pnp.h>
+#include <board/typec.h>
 #include <common/debug.h>
 
 #include <ec/espi.h>
@@ -28,6 +29,10 @@
 #define GPIO_SET_DEBUG(G, V) { \
     DEBUG("%s = %s\n", #G, V ? "true" : "false"); \
     gpio_set(&G, V); \
+}
+
+#define GPIO_GET_DEBUG(G) { \
+    DEBUG("- %s = %s\n", #G, gpio_get(&G) ? "true" : "false"); \
 }
 
 #ifndef HAVE_EC_EN
@@ -169,6 +174,13 @@ void update_power_state(void) {
                 break;
         }
     #endif
+        GPIO_GET_DEBUG(EC_EN);
+        GPIO_GET_DEBUG(SUSB_N_PCH);
+        GPIO_GET_DEBUG(SUSC_N_PCH);
+        GPIO_GET_DEBUG(EC_RSMRST_N);
+        GPIO_GET_DEBUG(ALL_SYS_PWRGD);
+        GPIO_GET_DEBUG(PCH_PWROK_EC);
+        GPIO_GET_DEBUG(PCH_DPWROK_EC);
     }
 }
 
@@ -393,6 +405,7 @@ void power_event(void) {
             battery_charger_configure();
         }
         battery_debug();
+        typec_debug();
 
         // Reset main loop cycle to force reading PECI and battery
         main_cycle = 0;

@@ -36,6 +36,10 @@ CFLAGS+=\
 CHARGER?=bq24780s
 SRC+=$(SYSTEM76_COMMON_DIR)/charger/$(CHARGER).c
 
+# Add Type-C controller
+TYPEC?=tps65993
+SRC+=$(SYSTEM76_COMMON_DIR)/typec/$(TYPEC).c
+
 # Add keyboard
 ifndef KEYBOARD
 $(error KEYBOARD is not set by the board)

@@ -199,7 +199,7 @@ uint8_t peci_get_fan_duty(void) {
         duty = fan_cooldown(&FAN, duty);
     }
 
-    TRACE("PECI temp=%d\n", peci_temp);
-    TRACE("fan duty set to=%d\n", duty);
+    //TRACE("PECI temp=%d\n", peci_temp);
+    //TRACE("fan duty set to=%d\n", duty);
     return duty;
 }

@@ -471,7 +471,7 @@ void kbc_event(struct Kbc * kbc) {
             // If a timeout occurs, clear status, print error, and skip read
             else if (kbc_second_wait == 0) {
                 ps2_reset(&PS2_TOUCHPAD);
-                TRACE("  write second port input TIMEOUT\n");
+                //TRACE("  write second port input TIMEOUT\n");
                 kbc_second_wait = 1;
             }
         }
