@@ -129,14 +129,14 @@ bool in_s0ix = false;
 bool use_s0ix = true;
 
 bool power_is_s0ix_enabled(void) {
-	return use_s0ix;
+    return use_s0ix;
 }
 
 void power_set_sleep_type(enum SleepType slp_type) {
-	if (slp_type == SLEEP_TYPE_S0IX)
-		use_s0ix = true;
-	if (slp_type == SLEEP_TYPE_S3)
-		use_s0ix = false;
+    if (slp_type == SLEEP_TYPE_S0IX)
+        use_s0ix = true;
+    if (slp_type == SLEEP_TYPE_S3)
+        use_s0ix = false;
 }
 #else
 
@@ -145,9 +145,9 @@ bool use_s0ix = USE_S0IX;
 bool power_is_s0ix_enabled(void)
 {
 #if USE_S0IX
-	return true;
+    return true;
 #else
-	return false;
+    return false;
 #endif
 }
 
