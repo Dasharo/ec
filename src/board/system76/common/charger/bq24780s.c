@@ -91,6 +91,7 @@ int16_t battery_charger_disable(void) {
 
 int16_t battery_charger_enable(void) {
     int16_t res = 0;
+    uint16_t chargeoption3;
 
     if (charger_enabled) return 0;
 
@@ -107,6 +108,12 @@ int16_t battery_charger_enable(void) {
 
     // Set input current in mA
     res = smbus_write(CHARGER_ADDRESS, REG_INPUT_CURRENT, INPUT_CURRENT);
+    if (res < 0) return res;
+
+    // Set EN_BOOST
+    res = smbus_read(CHARGER_ADDRESS, 0x37, &chargeoption3);
+    if (res < 0) return res;
+    res = smbus_write(CHARGER_ADDRESS, 0x37, chargeoption3 | BIT(2));
     if (res < 0) return res;
 
     // Set charge option 0 with watchdog disabled

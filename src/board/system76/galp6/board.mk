@@ -31,7 +31,7 @@ CFLAGS+=\
 	-DCHARGER_BATTERY_RSENSE=10 \
 	-DCHARGER_CHARGE_CURRENT=1536 \
 	-DCHARGER_CHARGE_VOLTAGE=17400 \
-	-DCHARGER_INPUT_CURRENT=4740
+	-DCHARGER_INPUT_CURRENT=2800 # Customized for mkc - safe for 60W over PD
 
 # Add system76 common code
 include src/board/system76/common/common.mk
