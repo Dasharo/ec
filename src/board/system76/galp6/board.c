@@ -4,6 +4,7 @@
 #include <board/board.h>
 #include <board/espi.h>
 #include <board/gpio.h>
+#include <board/typec.h>
 #include <ec/ec.h>
 
 void board_init(void) {
@@ -26,6 +27,8 @@ void board_init(void) {
 
 void board_event(void) {
     espi_event();
+
+    typec_event();
 
     ec_read_post_codes();
 }

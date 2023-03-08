@@ -12,6 +12,7 @@
 #include <board/lid.h>
 #include <board/pmc.h>
 #include <board/power.h>
+#include <board/typec.h>
 #include <common/macro.h>
 #include <common/debug.h>
 
@@ -173,7 +174,8 @@ static void hardware_hotkey(uint16_t key) {
             gpio_set(&CCD_EN, !gpio_get(&CCD_EN));
             break;
         case K_FAN_TOGGLE:
-            fan_max = !fan_max;
+            //fan_max = !fan_max;
+            typec_regdump();
             break;
         case K_KBD_BKL:
             kbled_set_brightness(kbled_get() + 1);

@@ -4,6 +4,7 @@
 #define _BOARD_TYPEC_H
 
 void typec_init(void);
-void typec_debug(void);
+void typec_event(void);
+void typec_regdump(void);
 
 #endif // _BOARD_TYPEC_H

@@ -405,7 +405,6 @@ void power_event(void) {
             battery_charger_configure();
         }
         battery_debug();
-        typec_debug();
 
         // Reset main loop cycle to force reading PECI and battery
         main_cycle = 0;
