@@ -10,10 +10,6 @@
 #include <ec/gpio.h>
 #include <ec/pwm.h>
 
-#ifndef USE_S0IX
-    #define USE_S0IX 0
-#endif
-
 // Fan speed is the lowest requested over HEATUP seconds
 #ifndef BOARD_HEATUP
     #define BOARD_HEATUP 4
@@ -141,13 +137,12 @@ int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data) {
 uint8_t peci_get_fan_duty(void) {
     uint8_t duty;
 
-#if USE_S0IX
-    // Use PECI if platform is not in CS
-    peci_on = !in_s0ix;
-#else // USE_S0IX
-    // Use PECI if in S0 state
-    peci_on = power_state == POWER_STATE_S0;
-#endif // USE_S0IX
+    if (power_is_s0ix_enabled())
+        // Use PECI if platform is not in CS
+        peci_on = !in_s0ix;
+    else
+        // Use PECI if in S0 state
+        peci_on = power_state == POWER_STATE_S0;
 
     if (peci_on) {
         // Wait for completion

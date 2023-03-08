@@ -22,6 +22,7 @@
     #include <board/kbled.h>
     #include <board/kbscan.h>
     #include <board/peci.h>
+    #include <board/power.h>
     #include <board/dgpu.h>
     #include <board/fan.h>
 #endif
@@ -273,6 +274,24 @@ static enum Result cmd_fan_curve_set(void) {
     }
     return RES_OK;
 }
+
+static enum Result cmd_sleep_type_set(void) {
+#if EC_ESPI
+    switch (smfi_cmd[SMFI_CMD_DATA]) {
+        case 0:
+            // Set sleep type to S0ix
+            power_set_sleep_type(SLEEP_TYPE_S0IX);
+            return RES_OK;
+        case 1:
+            // Set sleep type to S3
+            power_set_sleep_type(SLEEP_TYPE_S3);
+            return RES_OK;
+    }
+#endif
+    return RES_ERR;
+}
+
+
 #endif // !defined(__SCRATCH__)
 
 #if defined(__SCRATCH__)
@@ -403,6 +422,9 @@ void smfi_event(void) {
                 break;
             case CMD_FAN_CURVE_SET:
                 smfi_cmd[SMFI_CMD_RES] = cmd_fan_curve_set();
+                break;
+            case CMD_SLEEP_TYPE_SET:
+                smfi_cmd[SMFI_CMD_RES] = cmd_sleep_type_set();
                 break;
 #endif // !defined(__SCRATCH__)
             case CMD_SPI:

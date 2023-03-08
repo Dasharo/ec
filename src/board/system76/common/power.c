@@ -25,6 +25,7 @@
     #define USE_S0IX 0
 #endif
 
+
 #define GPIO_SET_DEBUG(G, V) { \
     DEBUG("%s = %s\n", #G, V ? "true" : "false"); \
     gpio_set(&G, V); \
@@ -125,7 +126,33 @@ enum PowerState power_state = POWER_STATE_OFF;
 
 #if EC_ESPI
 bool in_s0ix = false;
+bool use_s0ix = true;
+
+bool power_is_s0ix_enabled(void) {
+	return use_s0ix;
+}
+
+void power_set_sleep_type(enum SleepType slp_type) {
+	if (slp_type == SLEEP_TYPE_S0IX)
+		use_s0ix = true;
+	if (slp_type == SLEEP_TYPE_S3)
+		use_s0ix = false;
+}
+#else
+
+bool use_s0ix = USE_S0IX;
+
+bool power_is_s0ix_enabled(void)
+{
+#if USE_S0IX
+	return true;
+#else
+	return false;
 #endif
+}
+
+void power_set_sleep_type(enum SleepType slp_type) { }
+#endif // EC_ESPI
 
 enum PowerState calculate_power_state(void) {
     //TODO: Deep Sx states using SLP_SUS#
@@ -320,21 +347,27 @@ static bool power_peci_limit(bool ac) {
 // Set the power draw limit depending on if on AC or DC power
 void power_set_limit(void) {
     static bool last_power_limit_ac = true;
+    bool ac;
     // We don't use power_state because the latency needs to be low
-#if USE_S0IX
-    if (!in_s0ix) {
-#else
-    if (gpio_get(&BUF_PLT_RST_N)) {
-#endif
-        bool ac = !gpio_get(&ACIN_N);
-        if (last_power_limit_ac != ac) {
-            if (power_peci_limit(ac)) {
-                last_power_limit_ac = ac;
-            }
+    if (use_s0ix) {
+        if (in_s0ix) {
+            last_power_limit_ac = true;
+            return;
         }
     } else {
-        last_power_limit_ac = true;
+        if (!gpio_get(&BUF_PLT_RST_N)) {
+            last_power_limit_ac = true;
+            return;
+        }
     }
+
+    ac = !gpio_get(&ACIN_N);
+    if (last_power_limit_ac != ac) {
+        if (power_peci_limit(ac)) {
+            last_power_limit_ac = ac;
+        }
+    }
+
 }
 #else
 void power_set_limit(void) {}
@@ -357,7 +390,7 @@ static bool power_button_disabled(void) {
     return !gpio_get(&LID_SW_N) && gpio_get(&ACIN_N);
 }
 
-#if USE_S0IX
+
 static void update_s0ix_state()
 {
     uint32_t time = time_get();
@@ -369,7 +402,6 @@ static void update_s0ix_state()
     // Allow for sub-500ms wakeups
     in_s0ix = (time - last_sleep_time) < 500;
 }
-#endif
 
 void power_event(void) {
     // Check if the adapter line goes low
@@ -377,9 +409,8 @@ void power_event(void) {
     static bool ac_last = true;
     bool ac_new = gpio_get(&ACIN_N);
 
-    #if USE_S0IX
-    update_s0ix_state();
-    #endif
+    if (use_s0ix)
+        update_s0ix_state();
 
     if (ac_new != ac_last) {
         power_set_limit();
@@ -574,17 +605,14 @@ void power_event(void) {
     static uint32_t last_time = 0;
     uint32_t time = time_get();
     if (power_state == POWER_STATE_S0) {
-#if USE_S0IX
-        if (in_s0ix) {
+        if (use_s0ix && in_s0ix) {
             // Modern suspend, flashing green light
             if ((time - last_time) >= 1000) {
                 gpio_set(&LED_PWR, !gpio_get(&LED_PWR));
                 last_time = time;
             }
             gpio_set(&LED_ACIN, false);
-        } else
-#endif
-        {
+        } else {
             // CPU on, green light
             gpio_set(&LED_PWR, true);
             gpio_set(&LED_ACIN, false);
