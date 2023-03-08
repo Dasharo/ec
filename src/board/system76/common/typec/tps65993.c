@@ -74,7 +74,7 @@ void typec_event(void) {
     if (last != irq && !irq) {
         // dump IntEvent1
         typec_read(REG_INT_EVENT1, buf, 0xb);
-        DEBUG("New Type-C event: ");
+        DEBUG("New Type-C event: \n");
         DEBUG(" IntEvent1: ");
         for (int k = 1; k <= 0xb; k++)
             DEBUG(" %02x", buf[k]);
