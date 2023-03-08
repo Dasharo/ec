@@ -16,12 +16,28 @@
 
 #define TPS_MAX_LEN 64
 
+// TI defined PD controller registers
+
+// IntEvent/Mask/Clear registers
+#define REG_INT_LEN    0xB
+
 #define REG_INT_EVENT1 0x14
 #define REG_INT_EVENT2 0x15
 #define REG_INT_MASK1  0x16
 #define REG_INT_MASK2  0x17
 #define REG_INT_CLEAR1 0x18
 #define REG_INT_CLEAR2 0x19
+
+// Active Contract PDO register
+#define REG_ACT_CONT_PDO_LEN 0x6
+#define REG_ACT_CONT_PDO     0x34
+
+// Power Delivery Object
+struct pdo {
+    uint16_t max_current;
+    uint16_t voltage;
+    // incomplete
+};
 
 #define GPIO_GET_DEBUG(G) { \
     DEBUG("- %s = %s\n", #G, gpio_get(&G) ? "true" : "false"); \
@@ -67,43 +83,50 @@ void typec_init(void) {
 
 void typec_event(void) {
     static bool last = true;
-    uint8_t buf[TPS_MAX_LEN + 1];
+    uint8_t reg_int[REG_INT_LEN  + 1];
+    uint8_t reg_active_pdo[REG_INT_LEN  + 1];
     bool irq;
 
     irq = gpio_get(&TYPEC_IRQ_N); // active low
     if (last != irq && !irq) {
         // dump IntEvent1
-        typec_read(REG_INT_EVENT1, buf, 0xb);
+        typec_read(REG_INT_EVENT1, reg_int, REG_INT_LEN);
         DEBUG("New Type-C event: \n");
         DEBUG(" IntEvent1: ");
-        for (int k = 1; k <= 0xb; k++)
-            DEBUG(" %02x", buf[k]);
+        for (int k = 1; k <= REG_INT_LEN; k++)
+            DEBUG(" %02x", reg_int[k]);
         DEBUG("\n");
 
-        if (buf[1] & BIT(3))
+        if (reg_int[1] & BIT(3))
             DEBUG("  PlugInsertOrRemoval\n");
-        if (buf[1] & BIT(4))
+        if (reg_int[1] & BIT(4))
             DEBUG("  PRSwapComplete\n");
-        if (buf[2] & BIT(3))
+        if (reg_int[2] & BIT(3))
             DEBUG("  VDMReceived\n"); // Vendor Defined Message. Check VDM RX reg for details. Happens when connecting a Galaxy S21 phone
-        if (buf[2] & BIT(4))
+        if (reg_int[2] & BIT(4)) {
             DEBUG("  NewContractAsCons\n"); // Powered from a source, need to update charger params and PL4
-        if (buf[2] & BIT(5))
+            typec_read(REG_ACT_CONT_PDO, reg_active_pdo, REG_ACT_CONT_PDO_LEN);
+            struct pdo active_pdo = { reg_active_pdo[1]      | (reg_active_pdo[2] & 0x3) << 8, // bits 0:9
+                                      reg_active_pdo[2] >> 2 | (reg_active_pdo[3] & 0xf) << 6  // bits 10:19
+                                    };                                                         // TODO macro?
+            DEBUG("   Voltage: %d mV, max current: %d mA\n", active_pdo.voltage * 50, active_pdo.max_current * 10); // Powered from a source, need to update charger params and PL4
+        }
+        if (reg_int[2] & BIT(5))
             DEBUG("  NewContractAsProv\n"); // Powering a consumer, may need to decrease PL4
-        if (buf[3] & BIT(4))
+        if (reg_int[3] & BIT(4))
             DEBUG("  UsbHostPresent\n");
-        if (buf[3] & BIT(5))
+        if (reg_int[3] & BIT(5))
             DEBUG("  UsbHostPresentNoLonger\n");
-        if (buf[4] & BIT(0))
+        if (reg_int[4] & BIT(0))
             DEBUG("  PowerStatusUpdate\n"); // need to check 0x3F now
-        if (buf[4] & BIT(1))
+        if (reg_int[4] & BIT(1))
             DEBUG("  DataStatusUpdate\n"); // need to check 0x5F now
-        if (buf[4] & BIT(2))
+        if (reg_int[4] & BIT(2))
             DEBUG("  StatusUpdate\n"); // need to check 0x1A now
 
         // clear interrupt
-        typec_read(REG_INT_MASK1, buf, 0xb);
-        typec_write(REG_INT_CLEAR1, buf + 1, 0xb);
+        typec_read(REG_INT_MASK1, reg_int, REG_INT_LEN);
+        typec_write(REG_INT_CLEAR1, reg_int + 1, REG_INT_LEN);
     }
 
     last = irq;
