@@ -8,6 +8,7 @@
 #include <board/config.h>
 #include <board/fan.h>
 #include <board/gpio.h>
+#include <board/kbc.h>
 #include <board/kbled.h>
 #include <board/lid.h>
 #include <board/peci.h>
@@ -257,6 +258,7 @@ void power_on(void) {
         DEBUG("failed to reach S0, powering off\n");
         power_off();
     } else {
+        kbc_clear_lock();
         ps2_reset(&PS2_1);
         ps2_reset(&PS2_TOUCHPAD);
     }
@@ -354,6 +356,7 @@ void power_cpu_reset(void) {
     fan_reset();
     // Reset KBC and touchpad states
     kbled_reset();
+    kbc_clear_lock();
     ps2_reset(&PS2_1);
     ps2_reset(&PS2_TOUCHPAD);
 }
