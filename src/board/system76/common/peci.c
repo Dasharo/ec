@@ -142,8 +142,8 @@ uint8_t peci_get_fan_duty(void) {
     uint8_t duty;
 
 #if USE_S0IX
-    // Use PECI if platform is not in CS
-    peci_on = !in_s0ix;
+    // Use PECI if platform is in S0, but not in S0ix
+    peci_on = power_state == POWER_STATE_S0 && !in_s0ix;
 #else // USE_S0IX
     // Use PECI if in S0 state
     peci_on = power_state == POWER_STATE_S0;
