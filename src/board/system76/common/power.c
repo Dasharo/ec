@@ -14,6 +14,7 @@
 #include <board/power.h>
 #include <board/pmc.h>
 #include <board/pnp.h>
+#include <board/ps2.h>
 #include <common/debug.h>
 
 #include <ec/espi.h>
@@ -255,6 +256,9 @@ void power_on(void) {
     if (power_state != POWER_STATE_S0) {
         DEBUG("failed to reach S0, powering off\n");
         power_off();
+    } else {
+        ps2_reset(&PS2_1);
+        ps2_reset(&PS2_TOUCHPAD);
     }
 }
 
@@ -348,8 +352,10 @@ void power_cpu_reset(void) {
     acpi_reset();
     // Reset fans
     fan_reset();
-    //TODO: reset KBC and touchpad states
+    // Reset KBC and touchpad states
     kbled_reset();
+    ps2_reset(&PS2_1);
+    ps2_reset(&PS2_TOUCHPAD);
 }
 
 static bool power_button_disabled(void) {
