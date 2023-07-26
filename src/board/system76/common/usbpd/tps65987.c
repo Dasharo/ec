@@ -25,6 +25,9 @@ static int16_t usbpd_current_limit(void) {
         if (value[0] == 6) {
             uint32_t pdo = ((uint32_t)value[1]) | (((uint32_t)value[2]) << 8) |
                 (((uint32_t)value[3]) << 16) | (((uint32_t)value[4]) << 24);
+            if (!pdo) {
+                return -0x2000;
+            }
             DEBUG("USBPD PDO %08lX ", pdo);
             uint8_t kind = (uint8_t)((pdo >> 30) & 0b11);
             if (kind == 0b00) {
@@ -86,6 +89,8 @@ static void usbpd_dump(void) {
 }
 
 void usbpd_event(void) {
+    static uint8_t wait_for_contract = 0;
+
     bool update = false;
 
     static bool last_ac_in = false;
@@ -113,6 +118,10 @@ void usbpd_event(void) {
         update = true;
 
         DEBUG("SINK_CTRL %d\n", sink_ctrl);
+
+        if (sink_ctrl) {
+            wait_for_contract = 100;
+        }
     }
 
     static enum PowerState last_power_state = POWER_STATE_OFF;
@@ -122,25 +131,38 @@ void usbpd_event(void) {
         update = true;
     }
 
+    if (wait_for_contract) {
+        update = true;
+    }
+
     if (update) {
         // Default to disabling input current
         uint16_t next_input_current = 0;
+        uint16_t next_input_voltage = 0;
 
         if (ac_in) {
             if (jack_in) {
                 // Use default input current
                 next_input_current = CHARGER_INPUT_CURRENT;
+                next_input_voltage = BATTERY_CHARGER_VOLTAGE_AC;
             } else if (sink_ctrl) {
-                int16_t res = usbpd_current_limit();
-                if (res < 0) {
-                    DEBUG("ERR %04X\n", -res);
-                } else if (res < CHARGER_INPUT_CURRENT) {
-                    // Use USB-PD charger current if it provides less than AC adapter
-                    next_input_current = (uint16_t)res;
-                } else {
-                    // Use default input current if USB-PD charger provides more
-                    next_input_current = CHARGER_INPUT_CURRENT;
-                }
+                next_input_current = CHARGER_INPUT_CURRENT; // Default in case we can't get a value from controller
+                next_input_voltage = BATTERY_CHARGER_VOLTAGE_PD;
+            }
+        }
+
+        if (wait_for_contract) {
+            int16_t res = usbpd_current_limit();
+            if (res < 0) {
+                return;
+            } else if (res < CHARGER_INPUT_CURRENT) {
+                // Use USB-PD charger current if it provides less than AC adapter
+                next_input_current = (uint16_t)res;
+                wait_for_contract = 0;
+            } else {
+                // Use default input current if USB-PD charger provides more
+                next_input_current = CHARGER_INPUT_CURRENT;
+                wait_for_contract = 0;
             }
         }
 
@@ -154,10 +176,12 @@ void usbpd_event(void) {
 
         if (next_input_current != battery_charger_input_current) {
             battery_charger_input_current = next_input_current;
+            battery_charger_input_voltage = next_input_voltage;
             DEBUG("CHARGER LIMIT %d mA\n", battery_charger_input_current);
 
             // Disable smart charger so it is reconfigured with the new limit
             battery_charger_disable();
+            power_peci_limit(ac_in);
         }
     }
 
