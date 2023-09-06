@@ -93,7 +93,6 @@ void espi_init(void) {
     // Set maximum eSPI frequency to 50MHz
     DEBUG_SET(ESGCAC2, 0b111, 0b011);
 
-    espi_event();
 }
 
 void espi_reset(void) {
@@ -110,10 +109,22 @@ void espi_event(void) {
         ESGCTRL0 = value;
         DEBUG("ESGCTRL0 %X\n", value);
 
+        // Virtual Wires available?
         if (value & BIT(1)) {
-            // Set boot load status and boot load done high, once VWs can be set
-            VW_SET_DEBUG(VW_BOOT_LOAD_STATUS, VWS_HIGH);
-            VW_SET_DEBUG(VW_BOOT_LOAD_DONE, VWS_HIGH);
+            value = VWCTRL6;
+            // Skip sending boot load status and boot load done,
+            // if automatically sent earlier
+            if (value & BIT(0)) {
+                DEBUG("VW Boot_Load_Done/Status has been sent automatically\n");
+                // Clear the automatic send status
+                VWCTRL6 = BIT(0);
+            } else {
+                // Set boot load status and boot load done high
+                VW_SET_DEBUG(VW_BOOT_LOAD_STATUS, VWS_HIGH);
+                VW_SET_DEBUG(VW_BOOT_LOAD_DONE, VWS_HIGH);
+            }
+            if (value & BIT(1))
+                DEBUG("VW SUS_ACK# has been sent automatically\n");
         }
     }
 
