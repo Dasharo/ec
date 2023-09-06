@@ -10,6 +10,8 @@
 #include <board/board.h>
 #include <board/dgpu.h>
 #include <board/ecpm.h>
+#include <board/espi.h>
+#include <board/espi_mafs.h>
 #include <board/fan.h>
 #include <board/gpio.h>
 #include <board/gctrl.h>
@@ -55,6 +57,11 @@ void init(void) {
     ec_init();
     gctrl_init();
     gpio_init();
+
+#if CONFIG_BUS_ESPI
+    espi_init();
+    espi_enable_mafs();
+#endif
 
     // Can happen in any order
 #if HAVE_DGPU
