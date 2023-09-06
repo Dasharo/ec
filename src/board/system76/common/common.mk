@@ -98,6 +98,12 @@ include $(SYSTEM76_COMMON_DIR)/scratch/scratch.mk
 include $(SYSTEM76_COMMON_DIR)/flash/flash.mk
 board-common-y += flash/wrapper.c
 
+ifeq ($(CONFIG_BUS_ESPI),y)
+# Add scratch ROM for switchign to ESPI MAFS
+include $(SYSTEM76_COMMON_DIR)/espi_mafs/espi_mafs.mk
+board-common-y += espi_mafs/wrapper.c
+endif
+
 console_internal:
 	cargo build --manifest-path tool/Cargo.toml --release
 	sudo tool/target/release/system76_ectool console

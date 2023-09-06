@@ -19,6 +19,7 @@ void gpio_set(struct Gpio *gpio, bool value) {
     }
 }
 
+#if !defined(__ESPI_MAFS__)
 #ifdef GPIO_DEBUG
 static void gpio_debug_bank(
     char *bank,
@@ -58,3 +59,4 @@ void gpio_debug(void) {
 #undef bank
 }
 #endif // GPIO_DEBUG
+#endif // !defined(__ESPI_MAFS__)
