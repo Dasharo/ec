@@ -9,7 +9,7 @@
 #include <ec/ec.h>
 
 void board_init(void) {
-    espi_init();
+    espi_event();
 
     // Make sure charger is in off state, also enables PSYS
     battery_charger_disable();

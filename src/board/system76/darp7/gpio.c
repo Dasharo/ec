@@ -4,6 +4,7 @@
 #include <common/macro.h>
 
 // clang-format off
+#if !defined(__ESPI_MAFS__)
 struct Gpio __code ACIN_N =         GPIO(B, 0);
 struct Gpio __code AC_PRESENT =     GPIO(E, 1);
 struct Gpio __code ALL_SYS_PWRGD =  GPIO(C, 0);
@@ -11,17 +12,11 @@ struct Gpio __code BKL_EN =         GPIO(H, 2);
 struct Gpio __code BUF_PLT_RST_N =  GPIO(D, 2); // renamed to EC_ERST#
 struct Gpio __code CCD_EN =         GPIO(D, 1);
 struct Gpio __code CPU_C10_GATE_N = GPIO(D, 3);
-struct Gpio __code DD_ON =          GPIO(E, 4);
-struct Gpio __code EC_EN =          GPIO(B, 6); // renamed to SUSBC_EN
-struct Gpio __code EC_RSMRST_N =    GPIO(E, 5);
 struct Gpio __code LAN_WAKEUP_N =   GPIO(H, 4);
-struct Gpio __code LED_ACIN =       GPIO(C, 7);
 struct Gpio __code LED_BAT_CHG =    GPIO(H, 5);
 struct Gpio __code LED_BAT_FULL =   GPIO(J, 0);
-struct Gpio __code LED_PWR =        GPIO(D, 0);
 struct Gpio __code LID_SW_N =       GPIO(B, 1);
 struct Gpio __code ME_WE =          GPIO(I, 2);
-struct Gpio __code PCH_DPWROK_EC =  GPIO(B, 2);
 struct Gpio __code PCH_PWROK_EC =   GPIO(A, 4);
 struct Gpio __code PM_CLKRUN_N =    GPIO(H, 0);
 struct Gpio __code PM_PWROK =       GPIO(C, 6);
@@ -37,12 +32,20 @@ struct Gpio __code SUSB_N_PCH =     GPIO(H, 6);
 struct Gpio __code SUSC_N_PCH =     GPIO(H, 1);
 struct Gpio __code SWI_N =          GPIO(B, 5);
 struct Gpio __code USB_PWR_EN_N =   GPIO(E, 3);
-struct Gpio __code VA_EC_EN =       GPIO(J, 4);
 struct Gpio __code WLAN_EN =        GPIO(G, 1);
 struct Gpio __code WLAN_PWR_EN =    GPIO(A, 3);
 struct Gpio __code XLP_OUT =        GPIO(B, 4);
+#endif
+struct Gpio __code DD_ON =          GPIO(E, 4);
+struct Gpio __code EC_EN =          GPIO(B, 6); // renamed to SUSBC_EN
+struct Gpio __code EC_RSMRST_N =    GPIO(E, 5);
+struct Gpio __code VA_EC_EN =       GPIO(J, 4);
+struct Gpio __code PCH_DPWROK_EC =  GPIO(B, 2);
+struct Gpio __code LED_ACIN =       GPIO(C, 7);
+struct Gpio __code LED_PWR =        GPIO(D, 0);
 // clang-format on
 
+#if !defined(__ESPI_MAFS__)
 void gpio_init() {
     // Enable LPC reset on GPD2
     GCR = 0x04;
@@ -250,3 +253,4 @@ void gpio_init() {
     // ALERT#
     GPCRM6 = 0x86;
 }
+#endif // !defined(__ESPI_MAFS__)

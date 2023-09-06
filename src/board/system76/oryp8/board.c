@@ -8,7 +8,7 @@
 #include <ec/ec.h>
 
 void board_init(void) {
-    espi_init();
+    espi_event();
 
     // Allow backlight to be turned on
     gpio_set(&BKL_EN, true);

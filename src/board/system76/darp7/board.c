@@ -8,7 +8,7 @@
 #include <ec/ec.h>
 
 void board_init(void) {
-    espi_init();
+    espi_event();
 
     // Allow CPU to boot
     gpio_set(&SB_KBCRST_N, true);

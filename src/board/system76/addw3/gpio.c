@@ -34,6 +34,7 @@ struct Gpio __code WLAN_PWR_EN =    GPIO(D, 3);
 struct Gpio __code XLP_OUT =        GPIO(B, 4);
 // clang-format on
 
+#if !defined(__ESPI_MAFS__)
 void gpio_init() {
     // Enable LPC reset on GPD2
     GCR = 0x04;
@@ -269,3 +270,4 @@ void gpio_init() {
     // SERIRQ_ESPI_ALERT0
     GPCRM6 = GPIO_IN | GPIO_UP | GPIO_DOWN;
 }
+#endif // !defined(__ESPI_MAFS__)

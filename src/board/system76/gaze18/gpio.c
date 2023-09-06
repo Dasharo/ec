@@ -35,6 +35,7 @@ struct Gpio __code WLAN_PWR_EN =    GPIO(A, 3);
 struct Gpio __code XLP_OUT =        GPIO(B, 4);
 // clang-format on
 
+#if !defined(__ESPI_MAFS__)
 void gpio_init() {
     // Not documented
     //GCR22 = BIT(7);
@@ -261,3 +262,4 @@ void gpio_init() {
     // ESPI_ALRT0#
     GPCRM6 = GPIO_IN | GPIO_UP | GPIO_DOWN;
 }
+#endif // !defined(__ESPI_MAFS__)

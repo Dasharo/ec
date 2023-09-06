@@ -4,6 +4,7 @@
 #include <common/macro.h>
 
 // clang-format off
+#if !defined(__ESPI_MAFS_)
 struct Gpio __code ACIN_N =         GPIO(B, 0);
 struct Gpio __code AC_PRESENT =     GPIO(E, 1);
 struct Gpio __code ALL_SYS_PWRGD =  GPIO(C, 0);
@@ -11,18 +12,12 @@ struct Gpio __code BKL_EN =         GPIO(H, 2);
 struct Gpio __code BUF_PLT_RST_N =  GPIO(D, 2); // renamed to EC_ERST#
 struct Gpio __code CCD_EN =         GPIO(D, 1);
 struct Gpio __code CPU_C10_GATE_N = GPIO(D, 3);
-struct Gpio __code DD_ON =          GPIO(E, 4);
-struct Gpio __code EC_EN =          GPIO(B, 6); // renamed to SUSBC_EC#
-struct Gpio __code EC_RSMRST_N =    GPIO(E, 5);
 struct Gpio __code JACK_IN_N =      GPIO(A, 3);
 struct Gpio __code LAN_WAKEUP_N =   GPIO(H, 4);
-struct Gpio __code LED_ACIN =       GPIO(C, 7);
 struct Gpio __code LED_BAT_CHG =    GPIO(H, 5);
 struct Gpio __code LED_BAT_FULL =   GPIO(J, 0);
-struct Gpio __code LED_PWR =        GPIO(D, 0);
 struct Gpio __code LID_SW_N =       GPIO(B, 1);
 struct Gpio __code ME_WE =          GPIO(I, 2);
-struct Gpio __code PCH_DPWROK_EC =  GPIO(B, 2);
 struct Gpio __code PCH_PWROK_EC =   GPIO(A, 4);
 struct Gpio __code PWR_BTN_N =      GPIO(D, 5);
 struct Gpio __code PWR_SW_N =       GPIO(B, 3);
@@ -35,12 +30,20 @@ struct Gpio __code SMI_N =          GPIO(D, 4);
 struct Gpio __code SUSB_N_PCH =     GPIO(H, 6);
 struct Gpio __code SUSC_N_PCH =     GPIO(H, 1);
 struct Gpio __code SWI_N =          GPIO(B, 5);
-struct Gpio __code VA_EC_EN =       GPIO(J, 4);
 struct Gpio __code WLAN_EN =        GPIO(F, 3);
 struct Gpio __code WLAN_PWR_EN =    GPIO(G, 1);
 struct Gpio __code XLP_OUT =        GPIO(B, 4);
+#endif
+struct Gpio __code DD_ON =          GPIO(E, 4);
+struct Gpio __code EC_EN =          GPIO(B, 6); // renamed to SUSBC_EC#
+struct Gpio __code EC_RSMRST_N =    GPIO(E, 5);
+struct Gpio __code PCH_DPWROK_EC =  GPIO(B, 2);
+struct Gpio __code VA_EC_EN =       GPIO(J, 4);
+struct Gpio __code LED_PWR =        GPIO(D, 0);
+struct Gpio __code LED_ACIN =       GPIO(C, 7);
 // clang-format on
 
+#if !defined(__ESPI_MAFS_)
 void gpio_init(void) {
     // PWRSW WDT 2 Enable 2
     //GCR9 = BIT(5);
@@ -258,3 +261,4 @@ void gpio_init(void) {
     // ESPI_ALRT0#
     GPCRM6 = GPIO_IN | GPIO_UP | GPIO_DOWN;
 }
+#endif
