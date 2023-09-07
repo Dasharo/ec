@@ -57,6 +57,13 @@ void init(void) {
     ec_init();
     gctrl_init();
     gpio_init();
+#ifdef PARALLEL_DEBUG
+    parallel_debug = false;
+    if (parallel_init()) {
+        parallel_debug = true;
+        INFO("System76 EC board '%s', version '%s'\n", board(), version());
+    }
+#endif // PARALLEL_DEBUG
 
 #if CONFIG_BUS_ESPI
     espi_init();
@@ -71,11 +78,8 @@ void init(void) {
     kbc_init();
     kbled_init();
 #ifdef PARALLEL_DEBUG
-    parallel_debug = false;
-    if (parallel_init()) {
-        parallel_debug = true;
-    } else
-#endif // PARALLEL_DEBUG
+    if (parallel_debug)
+#endif
     {
         kbscan_init();
     }

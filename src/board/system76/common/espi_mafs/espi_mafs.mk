@@ -20,6 +20,7 @@ ESPI_MAFS_SRC += $(foreach src, $(espi_mafs-y), $(ESPI_MAFS_DIR)/$(src))
 
 ESPI_MAFS_SRC += $(BOARD_DIR)/gpio.c
 ESPI_MAFS_SRC += src/ec/ite/gpio.c
+ESPI_MAFS_SRC += src/ec/ite/espi.c
 
 ESPI_MAFS_BUILD=$(BUILD)/espi_mafs
 ESPI_MAFS_OBJ=$(sort $(patsubst src/%.c,$(ESPI_MAFS_BUILD)/%.rel,$(ESPI_MAFS_SRC)))

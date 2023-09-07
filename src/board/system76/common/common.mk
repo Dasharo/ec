@@ -38,7 +38,7 @@ board-common-y += wireless.c
 CFLAGS+=-DLEVEL=5
 
 # Uncomment to enable debug logging over keyboard parallel port
-#CFLAGS+=-DPARALLEL_DEBUG
+CFLAGS+=-DPARALLEL_DEBUG
 
 # Uncomment to enable I2C debug on 0x76
 #CFLAGS+=-DI2C_DEBUGGER=0x76

@@ -16,8 +16,6 @@ struct Gpio __code DGPU_PWR_EN =    GPIO(H, 4);
 struct Gpio __code GC6_FB_EN =      GPIO(J, 3);
 struct Gpio __code JACK_IN_N =      GPIO(E, 6);
 struct Gpio __code LAN_WAKEUP_N =   GPIO(B, 2);
-struct Gpio __code LED_BAT_CHG =    GPIO(H, 5);
-struct Gpio __code LED_BAT_FULL =   GPIO(J, 0);
 struct Gpio __code LID_SW_N =       GPIO(B, 1);
 struct Gpio __code ME_WE =          GPIO(A, 0);
 struct Gpio __code PCH_PWROK_EC =   GPIO(A, 6);
@@ -41,8 +39,10 @@ struct Gpio __code EC_RSMRST_N =    GPIO(E, 5);
 struct Gpio __code PCH_DPWROK_EC =  GPIO(C, 5);
 struct Gpio __code PD_EN =          GPIO(F, 3);
 struct Gpio __code VA_EC_EN =       GPIO(J, 4);
-struct Gpio __code LED_ACIN =       GPIO(C, 7);
 struct Gpio __code LED_PWR =        GPIO(D, 0);
+struct Gpio __code LED_BAT_FULL =   GPIO(J, 0);
+struct Gpio __code LED_ACIN =       GPIO(C, 7);
+struct Gpio __code LED_BAT_CHG =    GPIO(H, 5);
 // clang-format on
 
 #if !defined(__ESPI_MAFS__)

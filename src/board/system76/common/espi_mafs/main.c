@@ -65,18 +65,19 @@
 // VccPrimary stable (95%) to RSMRST# high
 #define tPCH03 delay_ms(10)
 // VccDSW 3.3 stable to VccPrimary 1.05V
-#define tPCH06 delay_us(200)
+#define tPCH06 delay_ms(1) // delay_us(200), but round up to 1ms to save space
 // De-assertion of RSMRST# to de-assertion of ESPI_RESET#
 #define tPCH18 delay_ms(95)
 // RSMRST# de-assertion to SUSPWRDNACK valid
 #define tPLT01 delay_ms(200)
 
-#define nop_us(X)   ((uint16_t)((uint32_t)(X) * 1000UL / 186UL))
-
-static void delay_ms(uint8_t ms);
-static void delay_us(uint16_t us);
+// With a PLL of 64MHz one machine cycle will take 12 / 64.5 MHz ~ 186ns
+// 1ms / 186 ns ~ 5376 machine cycles
+#define NOP_MS 5376
 
 volatile uint8_t __xdata __at(0x1080) FLHCTRL5;
+
+static inline void delay_ms(uint8_t ms);
 
 /**
  * Main entry point for switching to ESPI MAFS.
@@ -85,7 +86,7 @@ volatile uint8_t __xdata __at(0x1080) FLHCTRL5;
  *          first in the resulting binary. This is required to ensure that address
  *          matches the address (ESPI_MAFS_OFFSET) for espi_switch_to_mafs in wrapper.c.
  * NOTE: __critical to ensure interrupts are disabled. This does mean that interrupt
- *          such as the timer will be block until flash acccess is complete
+ *          such as the timer will be blocked until MAFS is complete
  */
 // clang-format off
 void espi_switch_to_mafs(void) __critical
@@ -133,8 +134,9 @@ void espi_switch_to_mafs(void) __critical
     // Wait for SUSPWRDNACK validity
     tPLT01;
 
-    gpio_set(&LED_PWR, false);
-    gpio_set(&LED_ACIN, true);
+    // Green light, step 1
+    gpio_set(&LED_PWR, true);
+    gpio_set(&LED_BAT_FULL, false);
 
     // Wait for flash channel enabled
     do {
@@ -146,33 +148,48 @@ void espi_switch_to_mafs(void) __critical
     ESGCTRL0 = BIT(3);
 
     // Enable uC code fetching via ESPI MAFS
-    FLHCTRL5 = BIT(3);
+    value = FLHCTRL5;
+    FLHCTRL5 = value | BIT(3);
 
-    gpio_set(&LED_PWR, true);
-    gpio_set(&LED_ACIN, false);
+    // Green light, step 2
+    gpio_set(&LED_PWR, false);
+    gpio_set(&LED_BAT_FULL, true);
+
     // Wait for uC to switch to ESPI MAFS
     do {
         value = FLHCTRL5;
     }while (!(value & BIT(3)));
 
+    // Green light, step 3
+    gpio_set(&LED_PWR, true);
+    gpio_set(&LED_BAT_FULL, true);
+
+    // Wait for virtual wire channel enabled
+    do {
+        value = ESGCTRL0;
+    }while (!(value & BIT(1)));
+
+    // Clear only the virtual wire channel status bit.
+    // Other bits will be cleared later
+    ESGCTRL0 = BIT(1);
+
+    // Set SLAVE_BOOT_LOAD_STATUS/DONE virtual wire
+    vw_set(&VW_BOOT_LOAD_STATUS, VWS_HIGH);
+    vw_set(&VW_BOOT_LOAD_DONE, VWS_HIGH);
+
+    // Set auto SUS_ACK# and Boot_Load_Done/Status bits for MAFS
+    value = VWCTRL5;
+    VWCTRL5 = value | BIT(0) | BIT(1);
+
+    // Light off
     gpio_set(&LED_PWR, false);
-    gpio_set(&LED_ACIN, false);
-    // Do not set SLAVE_BOOT_LOAD_DONE virtual wire yet.
-    // It will be done later in espi_event
+    gpio_set(&LED_BAT_FULL, false);
 }
 
-static void delay_ms(uint8_t ms) __critical
+static inline void delay_ms(uint8_t ms)
 {
     for (uint8_t i = ms; i != 0; i--) {
-        delay_us(1000);
+        for (uint16_t j = NOP_MS; j !=0; j--)
+            __asm__("nop");
     }
 }
-
-// With a PLL of 64MHz one machine cycle will take 12 / 64.5 MHz ~ 186ns
-static void delay_us(uint16_t us) __critical
-{
-    for (uint16_t i = nop_us(us); i != 0; i--) {
-        __asm__("nop");
-    }
-}
-

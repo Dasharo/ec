@@ -29,7 +29,11 @@ enum VirtualWireState {
 
 enum VirtualWireState vw_get(struct VirtualWire *vw) __critical;
 
+#if !defined(__ESPI_MAFS__)
 void vw_set(struct VirtualWire *vw, enum VirtualWireState state) __critical;
+#else
+void vw_set(struct VirtualWire *vw, enum VirtualWireState state);
+#endif
 
 // Not all wires are defined or implemented
 // Index 2 - AP to EC
