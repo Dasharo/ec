@@ -293,8 +293,10 @@ void power_off(void) {
     // Commit settings to flash on shutdown
     options_save_config();
 
-    // Trigger USB-PD disconnect, will be reconnected after TI reset
-    usbpd_disc(1);
+    // Cycle the PD controller and dock connection off and on to work around
+    // dock issues
+    usbpd_set_mode(USBPD_MODE_DISC);
+    usbpd_set_mode(USBPD_MODE_APP);
 
 #if HAVE_PCH_PWROK_EC
     // De-assert SYS_PWROK
