@@ -90,7 +90,7 @@
 #endif
 
 #ifndef HAVE_XLP_OUT
-#define HAVE_XLP_OUT 1
+#define HAVE_XLP_OUT 0
 #endif
 
 extern uint8_t main_cycle;
@@ -661,12 +661,9 @@ void power_event(void) {
         gpio_set(&LED_PWR, false);
         gpio_set(&LED_ACIN, true);
     } else {
-        // CPU off and AC adapter unplugged, flashing orange light
+        // CPU off and AC adapter unplugged, LEDs off
         gpio_set(&LED_PWR, false);
-        if ((time - last_time) >= 1000) {
-            gpio_set(&LED_ACIN, !gpio_get(&LED_ACIN));
-            last_time = time;
-        }
+        gpio_set(&LED_ACIN, false);
 
 #if HAVE_XLP_OUT
         // Power off VDD3 if system should be off
