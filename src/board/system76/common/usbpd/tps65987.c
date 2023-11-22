@@ -29,6 +29,19 @@ enum {
     USBPD_ERR_PDO_TYPE_UNSUP = 0x4000,
 };
 
+enum {
+    // Fully functional, normal operation
+    USBPD_MODE_APP = 0,
+    // PD controller is running BIST
+    USBPD_MODE_BIST,
+    // PD controller booted in dead battery mode
+    USBPD_MODE_BOOT,
+    // Simulated port disconnect by previously issued DISC command
+    USBPD_MODE_DISC,
+    // Other values indicate limited functionality
+    USBPD_MODE_UNKNOWN,
+};
+
 #define PDO_KIND(pdo) ((uint8_t)((pdo) >> 30 & 3))
 
 enum {
@@ -99,14 +112,14 @@ static void usbpd_dump(void) {
 // Check the operational state of the PD controller
 static int16_t usbpd_get_mode(void) {
     int16_t res;
-    uint32_t mode;
+    int16_t mode;
     uint8_t reg[5] = { 0 };
 
-    TRACE("USBPD controller mode: ");
+    DEBUG("USBPD controller mode: ");
 
     res = i2c_get(&I2C_USBPD, USBPD_ADDRESS, REG_MODE, reg, sizeof(reg));
     if (res < 0 || reg[0] < 4) {
-        TRACE("UNKNOWN (I2C error %d)\n", res);
+        DEBUG("UNKNOWN (I2C error %d)\n", res);
         return USBPD_MODE_UNKNOWN;
     }
 
@@ -114,20 +127,20 @@ static int16_t usbpd_get_mode(void) {
 
     switch (mode) {
     case FOURCC('A', 'P', 'P', ' '):
-        TRACE("APP\n");
+        DEBUG("APP\n");
         return USBPD_MODE_APP;
     case FOURCC('B', 'I', 'S', 'T'):
-        TRACE("BIST\n");
+        DEBUG("BIST\n");
         return USBPD_MODE_BIST;
     case FOURCC('B', 'O', 'O', 'T'):
-        TRACE("BOOT\n");
+        DEBUG("BOOT\n");
         return USBPD_MODE_BOOT;
     case FOURCC('D', 'I', 'S', 'C'):
-        TRACE("DISC\n");
+        DEBUG("DISC\n");
         return USBPD_MODE_DISC;
     }
 
-    TRACE("UNKNOWN\n");
+    DEBUG("UNKNOWN %llx\n", mode);
     return USBPD_MODE_UNKNOWN;
 }
 
@@ -154,41 +167,17 @@ static int16_t usbpd_disc(uint8_t timeout) {
 
 // Return to normal operation
 // Reboots the PD controller and exits any modal tasks
-static int16_t usbpd_gaid(void) {
+void usbpd_reset(void) {
     int16_t res;
 
     uint8_t cmd[5] = { 4, 'G', 'a', 'i', 'd' };
 
-    do {
-        res = i2c_set(&I2C_USBPD, USBPD_ADDRESS, REG_CMD1, cmd, sizeof(cmd));
-    } while (res < 0);
+    res = i2c_set(&I2C_USBPD, USBPD_ADDRESS, REG_CMD1, cmd, sizeof(cmd));
+    if (res < 0)
+        return;
 
     i2c_reset(&I2C_USBPD, true);
-
-    uint32_t deadline = time_get() + 10000; // 10 seconds
-    while (usbpd_get_mode() != USBPD_MODE_APP && time_get() < deadline) {};
-
-    if (time_get() > deadline) {
-        DEBUG("USBPD reboot timed out\n");
-        return -1;
-    }
-
-    DEBUG("USBPD reboot successful\n");
-
-    return 0;
-}
-
-void usbpd_set_mode(int16_t mode) {
-    switch (mode) {
-    case USBPD_MODE_APP:
-        usbpd_gaid();
-        break;
-    case USBPD_MODE_DISC:
-        usbpd_disc(0);
-        break;
-    default:
-        return;
-    }
+    return;
 }
 
 void usbpd_event(void) {
@@ -350,9 +339,4 @@ void usbpd_enable_charging(void) {
 
 void usbpd_init(void) {
     i2c_reset(&I2C_USBPD, true);
-
-    int16_t mode = usbpd_get_mode();
-
-    if (mode == USBPD_MODE_DISC || mode == USBPD_MODE_UNKNOWN)
-        usbpd_set_mode(USBPD_MODE_APP);
 }

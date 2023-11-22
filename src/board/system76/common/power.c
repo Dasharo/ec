@@ -175,6 +175,9 @@ void update_power_state(void) {
     if (power_state != new_power_state) {
         power_state = new_power_state;
 
+        if (power_state != POWER_STATE_S0)
+            pep_hook = PEP_DISPLAY_FLAG;
+
 #if LEVEL >= LEVEL_DEBUG
         switch (power_state) {
         case POWER_STATE_OFF:
@@ -387,6 +390,8 @@ void power_cpu_reset(void) {
     fan_reset();
     // Reset KBC and touchpad states
     kbled_reset();
+    // Reset USB-PD
+    usbpd_reset();
     // Set power limits
     power_peci_limit(!gpio_get(&ACIN_N));
     kbc_clear_lock();
