@@ -90,7 +90,7 @@
 #endif
 
 #ifndef HAVE_XLP_OUT
-#define HAVE_XLP_OUT 0
+#define HAVE_XLP_OUT 1
 #endif
 
 extern uint8_t main_cycle;
@@ -292,11 +292,6 @@ void power_off(void) {
 
     // Commit settings to flash on shutdown
     options_save_config();
-
-    // Cycle the PD controller and dock connection off and on to work around
-    // dock issues
-    usbpd_set_mode(USBPD_MODE_DISC);
-    usbpd_set_mode(USBPD_MODE_APP);
 
 #if HAVE_PCH_PWROK_EC
     // De-assert SYS_PWROK
@@ -595,7 +590,10 @@ void power_event(void) {
     {
         // Disable S5 power plane if not needed
         if (power_state == POWER_STATE_S5) {
-            power_off();
+            // Stay in S5 on AC
+            if (gpio_get(&ACIN_N)) {
+                power_off();
+            }
 
 #if CONFIG_SECURITY
             // Handle security state changes if necessary
