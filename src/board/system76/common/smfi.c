@@ -24,6 +24,8 @@
 #include <board/peci.h>
 #include <board/dgpu.h>
 #include <board/fan.h>
+#include <board/pmc.h>
+#include <board/usbpd.h>
 #include <board/wireless.h>
 #include <common/debug.h>
 
@@ -50,10 +52,14 @@ volatile uint8_t __xdata __at(0x105A) HRAMWC;
 volatile uint8_t __xdata __at(0x105B) HRAMW0BA;
 // Host RAM window 1 base address
 volatile uint8_t __xdata __at(0x105C) HRAMW1BA;
+// Host RAM window 2 base address
+volatile uint8_t __xdata __at(0x1076) HRAMW2BA;
 // Host RAM window 0 access allow size
 volatile uint8_t __xdata __at(0x105D) HRAMW0AAS;
 // Host RAM window 1 access allow size
 volatile uint8_t __xdata __at(0x105E) HRAMW1AAS;
+// Host RAM window 2 access allow size
+volatile uint8_t __xdata __at(0x1078) HRAMW2AAS;
 // Flash control register 3
 volatile uint8_t __xdata __at(0x1063) FLHCTRL3;
 // Host RAM window 2 base address
@@ -82,6 +88,10 @@ static volatile uint8_t __xdata __at(0xE00) smfi_cmd[256];
 #define SMFI_DBG_TAIL 0x00
 static volatile uint8_t __xdata __at(0xF00) smfi_dbg[256];
 
+// UCSI region - buffer for USB-PD communication
+#define SMFI_UCSI_CTL 0x48
+static volatile uint8_t __xdata __at(0xD00) smfi_ucsi[256];
+
 #if !defined(__SCRATCH__)
 void smfi_init(void) {
     int16_t i;
@@ -108,8 +118,12 @@ void smfi_init(void) {
     HRAMW1BA = 0xF0;
     HRAMW1AAS = 0x34;
 
-    // Enable H2RAM window 0 and 1 using LPC I/O
-    HRAMWC |= BIT(4) | BIT(1) | BIT(0);
+    // H2RAM window 2 address 0xD00 - 0xDFF, read/write
+    HRAMW2BA = 0xD0;
+    HRAMW2AAS = 0x04;
+
+    // Enable H2RAM window 0, 1 and 2 using LPC I/O
+    HRAMWC |= BIT(4) | BIT(2) | BIT(1) | BIT(0);
 
     // Enable backup ROM access
     FLHCTRL3 |= BIT(3);
@@ -447,6 +461,15 @@ void smfi_event(void) {
 
         // Mark command as finished
         smfi_cmd[SMFI_CMD_CMD] = CMD_NONE;
+    }
+
+    if (smfi_ucsi[SMFI_UCSI_CTL] == 1) {
+        DEBUG("UCSI command\n");
+        // Pass command to LPM
+        usbpd_ucsi_cmd(smfi_ucsi);
+        // Signal command finished
+        smfi_ucsi[SMFI_UCSI_CTL] = 0;
+        pmc_sci(&PMC_1, 0x1E);
     }
 }
 
