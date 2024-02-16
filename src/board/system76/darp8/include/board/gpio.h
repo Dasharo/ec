@@ -39,6 +39,7 @@ extern struct Gpio __code SB_KBCRST_N;
 extern struct Gpio __code SINK_CTRL;
 extern struct Gpio __code SLP_S0_N;
 extern struct Gpio __code SLP_SUS_N;
+extern struct Gpio __code SLP_WLAN_N;
 #define HAVE_SUSWARN_N 0
 #define HAVE_SUS_PWR_ACK 0
 extern struct Gpio __code SMI_N;

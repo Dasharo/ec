@@ -33,6 +33,7 @@ struct Gpio __code SB_KBCRST_N =    GPIO(E, 6);
 struct Gpio __code SINK_CTRL =      GPIO(D, 7);
 struct Gpio __code SLP_S0_N =       GPIO(J, 3);
 struct Gpio __code SLP_SUS_N =      GPIO(J, 7);
+struct Gpio __code SLP_WLAN_N =     GPIO(J, 6);
 struct Gpio __code SMI_N =          GPIO(D, 4);
 struct Gpio __code SUSB_N_PCH =     GPIO(H, 6);
 struct Gpio __code SUSC_N_PCH =     GPIO(H, 1);
