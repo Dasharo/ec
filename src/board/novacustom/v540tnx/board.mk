@@ -20,6 +20,9 @@ KEYMAP=combo_iso_ansi_micmute
 KBLED=white_dac
 CFLAGS+=-DKBLED_DAC=2
 
+# Set discrete GPU I2C bus
+CFLAGS+=-DI2C_DGPU=I2C_1
+
 # Set battery I2C bus
 CFLAGS += -DI2C_SMBUS=I2C_4
 
@@ -36,21 +39,20 @@ CFLAGS += \
 	-DCHARGER_BATTERY_RSENSE=10 \
 	-DCHARGER_CHARGE_CURRENT=1536 \
 	-DCHARGER_CHARGE_VOLTAGE=17600 \
-	-DCHARGER_INPUT_CURRENT=4740
+	-DCHARGER_INPUT_CURRENT=6500
 
 # Set CPU power limits in watts
 # AC: power rating of the included AC adapter
 # DC: battery discharge rate (assume 1C rating??)
 CFLAGS += \
-	-DPOWER_LIMIT_AC=90 \
-	-DPOWER_LIMIT_DC=73
+	-DPOWER_LIMIT_AC=180 \
+	-DPOWER_LIMIT_DC=80
 
-# Set fan parameters
-CFLAGS+=-DCPU_FAN2=3
+# DGPU support
+CFLAGS+=-DHAVE_DGPU=1 -DGPU_FAN1=3
 
 # Set USB-PD parameters
 USBPD=tps65987
-CFLAGS+=-DUSBPD_DUAL_PORT=1
 
 # Add common code
 include src/board/system76/common/common.mk

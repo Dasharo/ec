@@ -11,8 +11,10 @@ struct Gpio __code BKL_EN =         GPIO(C, 7);
 struct Gpio __code BUF_PLT_RST_N =  GPIO(D, 2);
 struct Gpio __code CCD_EN =         GPIO(D, 1);
 struct Gpio __code DD_ON =          GPIO(E, 4);
+struct Gpio __code DGPU_PWR_EN =    GPIO(H, 4);
 struct Gpio __code EC_EN =          GPIO(B, 6);
 struct Gpio __code EC_RSMRST_N =    GPIO(E, 5);
+struct Gpio __code GC6_FB_EN =      GPIO(J, 3);
 struct Gpio __code H_PROCHOT_EC =   GPIO(G, 6);
 struct Gpio __code JACK_IN_N =      GPIO(C, 6);
 struct Gpio __code LAN_WAKEUP_N =   GPIO(B, 2);
@@ -23,11 +25,11 @@ struct Gpio __code LED_PWR =        GPIO(D, 0);
 struct Gpio __code LID_SW_N =       GPIO(B, 1);
 struct Gpio __code PCH_PWROK_EC =   GPIO(F, 3);
 struct Gpio __code PD_EN =          GPIO(D, 4);
+struct Gpio __code PD_IRQ =         GPIO(E, 2);
 struct Gpio __code PWR_BTN_N =      GPIO(D, 5);
 struct Gpio __code PWR_SW_N =       GPIO(B, 3);
 struct Gpio __code RGBKB_DET_N =    GPIO(I, 2);
-struct Gpio __code SINK_CTRL =      GPIO(J, 3);
-struct Gpio __code SINK_CTRL_2 =    GPIO(J, 5);
+struct Gpio __code SINK_CTRL =      GPIO(H, 7);
 struct Gpio __code SUSB_N_PCH =     GPIO(H, 0);
 struct Gpio __code SUSC_N_PCH =     GPIO(H, 1);
 struct Gpio __code VA_EC_EN =       GPIO(J, 4);
@@ -37,26 +39,30 @@ struct Gpio __code XLP_OUT =        GPIO(B, 4);
 
 void gpio_init(void) {
     // Set global configuration
-    // Enable LPC reset on GPD2
-    GCR = 0b10 << 1;
-    // Disable UARTs
+    GCR = 4;
+    GCR1 = 0;
+    GCR2 = 0;
+    GCR3 = 64;
+    GCR4 = 0;
+    GCR5 = 0;
     GCR6 = 0;
-    // PWRSW WDT 2 Enable 1
-    GCR8 = BIT(4);
-    // PWRSW WDT 2 Enable 2
-    GCR9 = BIT(5);
-    // Enable SMBus channel 4
-    GCR15 = BIT(4);
-    // Set GPB5 and GPD2 to 1.8V
-    GCR19 = BIT(7) | BIT(0);
-    // Set GPD3 to 1.8V, GPF2 and GPF3 to 3.3V
-    GCR20 = BIT(7);
-    // Set GPF7, GPH0, and GPH1 to 1.8V
-    GCR21 = BIT(5) | BIT(2) | BIT(1);
-    // Set VCC power domain to 1.8V
-    GCR22 = BIT(7);
-    // Set GPM6 power domain to VCC
-    GCR23 = BIT(0);
+    GCR7 = 0;
+    GCR8 = 16;
+    GCR9 = 32;
+    GCR10 = 2;
+    GCR11 = 0;
+    GCR12 = 0;
+    GCR13 = 0;
+    GCR14 = 0;
+    GCR15 = 16;
+    GCR16 = 0;
+    GCR17 = 0;
+    GCR18 = 0;
+    GCR19 = 129;
+    GCR20 = 0;
+    GCR21 = 0;
+    GCR22 = 16;
+    GCR23 = 32;
 
     // Set GPIO data
     GPDRA = 0;
@@ -71,7 +77,8 @@ void gpio_init(void) {
     GPDRF = BIT(6);
     // H_PROCHOT_EC
     GPDRG = BIT(6);
-    GPDRH = 0;
+    // BL_PWM_EN_EC, PLVDD_RST_EC
+    GPDRH = BIT(6) | BIT(3);
     GPDRI = 0;
     // KBC_MUTE#
     GPDRJ = BIT(1);
@@ -83,11 +90,11 @@ void gpio_init(void) {
     GPCRA0 = GPIO_ALT;
     // KBC_BEEP
     GPCRA1 = GPIO_ALT;
-    // CPU_FAN1
+    // CPU_FAN
     GPCRA2 = GPIO_ALT;
-    // CPU_FAN2
+    // VGA_FAN
     GPCRA3 = GPIO_ALT;
-    // NC
+    // DDS_EC_PWM
     GPCRA4 = GPIO_IN;
     // EC_PWM_LEDKB_R
     GPCRA5 = GPIO_ALT;
@@ -110,6 +117,8 @@ void gpio_init(void) {
     GPCRB5 = GPIO_IN;
     // SUSBC_EC
     GPCRB6 = GPIO_OUT;
+    // Unknown
+    GPCRB7 = GPIO_IN;
 
     // ALL_SYS_PWRGD
     GPCRC0 = GPIO_IN;
@@ -126,12 +135,12 @@ void gpio_init(void) {
     // JACK_IN#_EC
     GPCRC6 = GPIO_IN;
     // BKL_EN
-    GPCRC7 = GPIO_OUT;
+    GPCRC7 = GPIO_OUT | GPIO_UP;
 
     // LED_PWR
     GPCRD0 = GPIO_OUT;
     // CCD_EN
-    GPCRD1 = GPIO_OUT;
+    GPCRD1 = GPIO_OUT | GPIO_UP;
     // ESPI_RESET_N
     GPCRD2 = GPIO_ALT;
     // SLP_A#
@@ -140,10 +149,10 @@ void gpio_init(void) {
     GPCRD4 = GPIO_OUT;
     // PWR_BTN#
     GPCRD5 = GPIO_OUT;
-    // CPU_FANSEN1
-    GPCRD6 = GPIO_ALT;
-    // CPU_FANSEN2
-    GPCRD7 = GPIO_ALT;
+    // CPU_FANSEN
+    GPCRD6 = GPIO_ALT | GPIO_DOWN;
+    // VGA_FANSEN
+    GPCRD7 = GPIO_ALT | GPIO_DOWN;
 
     // SMC_BAT
     GPCRE0 = GPIO_ALT | GPIO_UP;
@@ -152,7 +161,7 @@ void gpio_init(void) {
     // TBT_I2C_IRQ2Z
     GPCRE2 = GPIO_IN;
     // USB_PWR_EN
-    GPCRE3 = GPIO_OUT;
+    GPCRE3 = GPIO_OUT | GPIO_UP;
     // DD_ON
     GPCRE4 = GPIO_OUT;
     // EC_RSMRST#
@@ -163,13 +172,13 @@ void gpio_init(void) {
     GPCRE7 = GPIO_ALT | GPIO_UP;
 
     // 80CLK
-    GPCRF0 = GPIO_IN;
+    GPCRF0 = GPIO_OUT | GPIO_UP;
     // USB_CHARGE_EN
     GPCRF1 = GPIO_OUT;
     // 3IN1
-    GPCRF2 = GPIO_IN;
+    GPCRF2 = GPIO_OUT | GPIO_UP;
     // PCH_PWROK_EC
-    GPCRF3 = GPIO_OUT;
+    GPCRF3 = GPIO_OUT | GPIO_UP;
     // TP_CLK
     GPCRF4 = GPIO_ALT | GPIO_UP;
     // TP_DATA
@@ -177,12 +186,12 @@ void gpio_init(void) {
     // H_PECI
     GPCRF6 = GPIO_ALT;
     // AC_PRESENT
-    GPCRF7 = GPIO_OUT;
+    GPCRF7 = GPIO_OUT | GPIO_UP;
 
-    // NC
-    GPCRG0 = GPIO_IN;
-    // NC
-    GPCRG1 = GPIO_IN;
+    // dGPU_GPIO8_OVERT
+    GPCRG0 = GPIO_IN | GPIO_UP;
+    // MUX_CTRL_BIOS
+    GPCRG1 = GPIO_OUT;
     // 100k pull-up to VDD3
     GPCRG2 = GPIO_IN;
     // HSPI_CE#
@@ -201,16 +210,16 @@ void gpio_init(void) {
     // SUSC#_PCH
     GPCRH1 = GPIO_IN;
     // LED_ACIN
-    GPCRH2 = GPIO_OUT;
-    // NC
-    GPCRH3 = GPIO_IN;
-    // NC
+    GPCRH2 = GPIO_OUT | GPIO_UP;
+    // PLVDD_RST_EC
+    GPCRH3 = GPIO_OUT;
+    // DGPU_PWR_EN
     GPCRH4 = GPIO_IN;
     // LED_BAT_CHG
     GPCRH5 = GPIO_OUT;
-    // NC
-    GPCRH6 = GPIO_IN;
-    // NC
+    // BL_PWM_EN_EC
+    GPCRH6 = GPIO_OUT;
+    // SINK_CTRL_EC
     GPCRH7 = GPIO_IN;
 
     // BAT_DET
@@ -223,8 +232,8 @@ void gpio_init(void) {
     GPCRI3 = GPIO_ALT;
     // TOTAL_CUR
     GPCRI4 = GPIO_ALT;
-    // EC_CCD_WP#
-    GPCRI5 = GPIO_OUT;
+    // THERM_VOLT3
+    GPCRI5 = GPIO_ALT;
     // THERM_VOLT2
     GPCRI6 = GPIO_ALT;
     // MODEL_ID
@@ -236,16 +245,16 @@ void gpio_init(void) {
     GPCRJ1 = GPIO_OUT;
     // KBLIGHT_ADJ
     GPCRJ2 = GPIO_ALT;
-    // SINK_CTRL_EC_1
+    // GC6_FB_EN_PCH
     GPCRJ3 = GPIO_IN;
     // VA_EC_EN
     GPCRJ4 = GPIO_OUT;
-    // SINK_CTRL_EC_2
-    GPCRJ5 = GPIO_IN;
+    // VBATT_BOOST#
+    GPCRJ5 = GPIO_IN; // should probably be output, but Clevo FW set it as input
     // EC_GPIO
-    GPCRJ6 = GPIO_OUT;
+    GPCRJ6 = GPIO_OUT | GPIO_UP;
     // KB-DET
-    GPCRJ7 = GPIO_IN;
+    GPCRJ7 = GPIO_IN | GPIO_UP;
 
     // ESPI_IO0_EC
     GPCRM0 = GPIO_ALT | GPIO_UP | GPIO_DOWN;

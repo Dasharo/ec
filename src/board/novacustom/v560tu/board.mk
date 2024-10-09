@@ -14,6 +14,7 @@ CFLAGS+=-DUSE_S0IX=1
 
 # Include keyboard
 KEYBOARD = 15in_102
+KEYMAP=micmute
 
 # Set keyboard LED mechanism
 KBLED = rgb_pwm
@@ -44,7 +45,7 @@ CFLAGS += \
 	-DPOWER_LIMIT_DC=73
 
 # Set fan parameters
-CFLAGS+=-DHAVE_CPU_FAN2=1
+CFLAGS+=-DCPU_FAN2=3
 
 # Set USB-PD parameters
 USBPD=tps65987
