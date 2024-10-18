@@ -17,8 +17,16 @@
 #define REG_MODE 0x03
 #define REG_CMD1 0x08
 #define REG_DATA1 0x09
+#define REG_INT_EVENT_1 0x14
+#define REG_INT_EVENT_2 0x15
+#define REG_INT_CLEAR_1 0x18
+#define REG_INT_CLEAR_2 0x19
 #define REG_GLOBAL_CONFIG 0x27
 #define REG_ACTIVE_CONTRACT_PDO 0x34
+
+#ifndef HAVE_PD_IRQ
+#define HAVE_PD_IRQ 0
+#endif
 
 enum {
     // PDO is empty
@@ -197,6 +205,31 @@ static void usbpd_set_multiport_policy(void) {
     DEBUG("USBPD multiport policy set RES = %ld\n", res);
 }
 
+static void usbpd_clear_event() {
+    int16_t res;
+    uint8_t reg[12] = { 0 };
+
+    DEBUG("USBPD IRQ\n");
+
+    res = i2c_get(&I2C_USBPD, PORT_A_ADDRESS, REG_INT_EVENT_1, reg, sizeof(reg));
+    if (res < 0)
+        return;
+
+    res = i2c_set(&I2C_USBPD, PORT_A_ADDRESS, REG_INT_CLEAR_1, reg, sizeof(reg));
+    if (res < 0)
+        return;
+
+#ifdef USBPD_DUAL_PORT
+    res = i2c_get(&I2C_USBPD, PORT_B_ADDRESS, REG_INT_EVENT_1, reg, sizeof(reg));
+    if (res < 0)
+        return;
+
+    res = i2c_set(&I2C_USBPD, PORT_B_ADDRESS, REG_INT_CLEAR_1, reg, sizeof(reg));
+    if (res < 0)
+        return;
+#endif
+}
+
 void usbpd_event(void) {
     bool update = false;
     int16_t res;
@@ -269,27 +302,35 @@ void usbpd_event(void) {
             } else if (sink_ctrl_1) {
                 while ((res = usbpd_current_limit(PORT_A_ADDRESS)) < 0 && retry--) {};
                 next_input_current = res < CHARGER_INPUT_CURRENT ? res : CHARGER_INPUT_CURRENT;
+                next_input_current = (uint32_t)next_input_current * 93 / 100;
                 next_input_voltage = BATTERY_CHARGER_VOLTAGE_PD;
 #ifdef USBPD_DUAL_PORT
             } else if (sink_ctrl_2) {
                 while ((res = usbpd_current_limit(PORT_B_ADDRESS)) < 0 && retry--) {};
                 next_input_current = res < CHARGER_INPUT_CURRENT ? res : CHARGER_INPUT_CURRENT;
+                next_input_current = (uint32_t)next_input_current * 93 / 100;
                 next_input_voltage = BATTERY_CHARGER_VOLTAGE_PD;
 #endif
             }
         }
 
-        if (next_input_current != battery_charger_input_current) {
-            battery_charger_input_current = next_input_current;
-            battery_charger_input_voltage = next_input_voltage;
-            DEBUG("CHARGER LIMIT %d mA\n", battery_charger_input_current);
+        if (next_input_current != battery_charger_input_current_ma) {
+            battery_charger_input_current_ma = next_input_current;
+            battery_charger_input_voltage_v = next_input_voltage;
+            DEBUG("CHARGER LIMIT %d mA\n", battery_charger_input_current_ma);
 
             // Disable smart charger so it is reconfigured with the new limit
             battery_charger_disable();
             // In case power was renegotiated without power loss
-            power_peci_limit(true);
+            power_apply_limit(true);
         }
     }
+
+#if HAVE_PD_IRQ
+    /* For now, all we do is clear all events */
+    if (power_state != POWER_STATE_OFF && !gpio_get(&PD_IRQ))
+        usbpd_clear_event();
+#endif
 }
 
 void usbpd_init(void) {
