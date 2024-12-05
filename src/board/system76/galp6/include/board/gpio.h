@@ -48,10 +48,13 @@ extern struct Gpio __code SUSC_N_PCH;
 #define HAVE_SUSWARN_N 0
 #define HAVE_SUS_PWR_ACK 0
 extern struct Gpio __code SWI_N;
+extern struct Gpio __code USB_PWR_EN_N;
 extern struct Gpio __code VA_EC_EN;
 extern struct Gpio __code WLAN_EN;
 extern struct Gpio __code WLAN_PWR_EN;
 extern struct Gpio __code XLP_OUT;
+#define HAVE_USB_CHARGE_EN 1
+extern struct Gpio __code USB_CHARGE_EN;
 // clang-format on
 
 #endif // _BOARD_GPIO_H

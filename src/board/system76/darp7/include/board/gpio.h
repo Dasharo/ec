@@ -53,6 +53,10 @@ extern struct Gpio __code VR_ON;
 extern struct Gpio __code WLAN_EN;
 extern struct Gpio __code WLAN_PWR_EN;
 extern struct Gpio __code XLP_OUT;
+#define HAVE_USB_CHARGE_EN 1
+extern struct Gpio __code USB_CHARGE_EN;
+#define HAVE_CC_EN 1
+extern struct Gpio __code CC_EN;
 // clang-format on
 
 #endif // _BOARD_GPIO_H

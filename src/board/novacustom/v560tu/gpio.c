@@ -65,8 +65,6 @@ void gpio_init(void) {
     GPDRC = 0;
     // PWR_BTN#
     GPDRD = BIT(5);
-    // USB_PWR_EN
-    GPDRE = BIT(3);
     // H_PECI
     GPDRF = BIT(6);
     // H_PROCHOT_EC

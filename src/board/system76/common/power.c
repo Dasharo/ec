@@ -93,6 +93,19 @@
 #define HAVE_PD_EN 0
 #endif
 
+// Disable by default
+#ifndef HAVE_USB_CHARGE_EN
+#define HAVE_USB_CHARGE_EN 0
+#endif
+
+#ifndef HAVE_USB_PWR_EN_N
+#define HAVE_USB_PWR_EN_N 1
+#endif
+
+#ifndef HAVE_CC_EN
+#define HAVE_CC_EN 0
+#endif
+
 #ifndef HAVE_XLP_OUT
 #define HAVE_XLP_OUT 1
 #endif
@@ -201,6 +214,70 @@ void update_power_state(void) {
     }
 }
 
+static void usb_power_control(bool enable) {
+#if HAVE_USB_PWR_EN_N
+    GPIO_SET_DEBUG(USB_PWR_EN_N, enable);
+    delay_ms(20);
+#endif
+#if HAVE_PD_EN
+    GPIO_SET_DEBUG(PD_EN, enable);
+    delay_ms(20);
+#endif
+#if HAVE_CC_EN
+    // CC_EN controls USB Type-C port power
+    GPIO_SET_DEBUG(CC_EN, enable);
+    delay_ms(20);
+#endif
+}
+
+static void configure_usb_port_power(bool powering_on, bool ac_change) {
+    bool usb_port_power;
+    static bool usb_port_power_last = false;
+    uint8_t usb_power_opt = options_get(OPT_USB_POWER);
+
+    if (usb_power_opt > USB_POWER_ON_AC)
+        usb_power_opt = USB_POWER_ON_IN_S0;
+
+    usb_port_power = (usb_power_opt == USB_POWER_ALWAYS_ON);
+
+    DEBUG("Configure USB port power, option %u, state %u\n", usb_power_opt, usb_port_power);
+
+    update_power_state();
+
+    if (powering_on) {
+        usb_port_power = true;
+#if HAVE_USB_CHARGE_EN
+        GPIO_SET_DEBUG(USB_CHARGE_EN, false);
+        delay_ms(20);
+#endif
+    } else if (ac_change) {
+        // If we change AC state, only change USB port power in the powered
+        // off/S5 state
+        if (power_state == POWER_STATE_OFF || power_state == POWER_STATE_S5) {
+            if (usb_power_opt == USB_POWER_ON_AC)
+                usb_port_power = !gpio_get(&ACIN_N);
+        } else {
+            usb_port_power = usb_port_power_last;
+        }
+    } else {
+        if (usb_power_opt == USB_POWER_ON_AC)
+            usb_port_power = !gpio_get(&ACIN_N);
+    }
+
+    if (usb_port_power_last != usb_port_power) {
+        usb_port_power_last = usb_port_power;
+
+        DEBUG("USB ports power change to %sabled\n", usb_port_power ? "en" : "dis");
+
+        usb_power_control(usb_port_power);
+#if HAVE_USB_CHARGE_EN
+        if (!powering_on)
+            // Enables VDD5 (like DD_ON), but does not enable 3.3V
+            GPIO_SET_DEBUG(USB_CHARGE_EN, usb_port_power);
+#endif
+    }
+}
+
 void power_init(void) {
     // See Figure 12-19 in Whiskey Lake Platform Design Guide
     // | VCCRTC | RTCRST# | VccPRIM |
@@ -211,6 +288,11 @@ void power_init(void) {
     tPCH04;
 
     update_power_state();
+
+    // Set USB power according to option. Must be called when AC is being
+    // plugged while powered off, otherwise one would have to press a power
+    // button to make effect.
+    // configure_usb_port_power(false, false);
 }
 
 void power_on(void) {
@@ -229,13 +311,14 @@ void power_on(void) {
     // avoid leakage
     GPIO_SET_DEBUG(VA_EC_EN, true);
 #endif // HAVE_VA_EC_EN
-#if HAVE_PD_EN
-    GPIO_SET_DEBUG(PD_EN, true);
-#endif
+
     tPCH06;
 
     // Enable VDD5
     GPIO_SET_DEBUG(DD_ON, true);
+
+    // Configure USB port power before powering on
+    configure_usb_port_power(true, false);
 
 #if HAVE_SUS_PWR_ACK
     // De-assert SUS_ACK# - TODO is this needed on non-dsx?
@@ -318,13 +401,12 @@ void power_off(void) {
     // De-assert RSMRST#
     GPIO_SET_DEBUG(EC_RSMRST_N, false);
 
+    configure_usb_port_power(false, false);
+
     // Disable VDD5
     GPIO_SET_DEBUG(DD_ON, false);
     tPCH12;
 
-#if HAVE_PD_EN
-    GPIO_SET_DEBUG(PD_EN, false);
-#endif
 #if HAVE_VA_EC_EN
     // Disable VCCPRIM_* planes
     GPIO_SET_DEBUG(VA_EC_EN, false);
@@ -429,6 +511,7 @@ void power_event(void) {
             GPIO_SET_DEBUG(H_PROCHOT_EC, false);
             ac_unplug_time = time_get();
             battery_charger_disable();
+            configure_usb_port_power(false, true);
         } else {
             DEBUG("plugged in\n");
             battery_charger_configure();
@@ -438,6 +521,7 @@ void power_event(void) {
                     power_on();
                     break;
                 case POWER_STATE_S5:
+                    configure_usb_port_power(true, true);
                     GPIO_SET_DEBUG(PWR_BTN_N, false);
                     delay_ms(32); // PWRBTN# must assert for at least 16 ms, we do twice that
                     GPIO_SET_DEBUG(PWR_BTN_N, true);
@@ -445,6 +529,8 @@ void power_event(void) {
                 default:
                     break;
                 }
+            } else {
+                configure_usb_port_power(false, true);
             }
         }
         power_apply_limit(!ac_new);
@@ -542,6 +628,9 @@ void power_event(void) {
         // Assert SYS_PWROK, system can finally perform PLT_RST# and boot
         GPIO_SET_DEBUG(PCH_PWROK_EC, true);
 #endif // HAVE_PCH_PWROK_EC
+
+        configure_usb_port_power(true, false);
+
     } else if (!pg_new && pg_last) {
         DEBUG("%02X: ALL_SYS_PWRGD de-asserted\n", main_cycle);
 
@@ -554,6 +643,8 @@ void power_event(void) {
         // De-assert PCH_PWROK
         GPIO_SET_DEBUG(PM_PWROK, false);
 #endif // HAVE_PM_PWROK
+
+        configure_usb_port_power(false, false);
     }
     pg_last = pg_new;
 
@@ -682,15 +773,22 @@ void power_event(void) {
     } else {
         // CPU off and AC adapter unplugged, flashing orange light
         gpio_set(&LED_PWR, false);
-        if ((time - last_time) >= 1000) {
-            gpio_set(&LED_ACIN, !gpio_get(&LED_ACIN));
-            last_time = time;
-        }
 
+        // Don't blink if we have USB power enabled, because we can't
+        // unset XLP_OUT to keep USB powered
+        if (options_get(OPT_USB_POWER) == USB_POWER_ON_IN_S0) {
+            if ((time - last_time) >= 1000) {
+                gpio_set(&LED_ACIN, !gpio_get(&LED_ACIN));
+                last_time = time;
+            }
 #if HAVE_XLP_OUT
-        // Power off VDD3 if system should be off
-        gpio_set(&XLP_OUT, 0);
+            DEBUG("Powering off VDD3\n");
+            // Power off VDD3 if system should be off
+            gpio_set(&XLP_OUT, 0);
 #endif // HAVE_XLP_OUT
+        } else {
+            gpio_set(&LED_ACIN, false);
+        }
     }
 
 //TODO: do not require both LEDs

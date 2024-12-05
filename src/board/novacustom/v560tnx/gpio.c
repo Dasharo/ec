@@ -71,8 +71,6 @@ void gpio_init(void) {
     GPDRC = 0;
     // PWR_BTN#
     GPDRD = BIT(5);
-    // USB_PWR_EN
-    GPDRE = BIT(3);
     // H_PECI
     GPDRF = BIT(6);
     // H_PROCHOT_EC
@@ -159,7 +157,7 @@ void gpio_init(void) {
     // TBT_I2C_IRQ2Z
     GPCRE2 = GPIO_IN;
     // USB_PWR_EN
-    GPCRE3 = GPIO_OUT | GPIO_UP;
+    GPCRE3 = GPIO_OUT;
     // DD_ON
     GPCRE4 = GPIO_OUT;
     // EC_RSMRST#
