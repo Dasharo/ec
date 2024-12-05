@@ -42,6 +42,8 @@ struct Gpio __code VA_EC_EN =       GPIO(J, 4);
 struct Gpio __code WLAN_EN =        GPIO(G, 1);
 struct Gpio __code WLAN_PWR_EN =    GPIO(A, 3);
 struct Gpio __code XLP_OUT =        GPIO(B, 4);
+struct Gpio __code USB_CHARGE_EN =  GPIO(F, 1);
+struct Gpio __code CC_EN =          GPIO(F, 7);
 // clang-format on
 
 void gpio_init() {
@@ -68,8 +70,6 @@ void gpio_init() {
     GPDRC = 0;
     // PWR_BTN#, SMI#
     GPDRD = BIT(5) | BIT(4);
-    // USB_PWR_EN#
-    GPDRE = BIT(3);
     // H_PECI
     GPDRF = BIT(6);
     // H_PROCHOT_EC#
@@ -152,7 +152,7 @@ void gpio_init() {
     // RGBKB-DET#
     GPCRE2 = GPIO_IN | GPIO_UP;
     // USB_PWR_EN#
-    GPCRE3 = GPIO_OUT | GPIO_UP;
+    GPCRE3 = GPIO_OUT;
     // DD_ON
     GPCRE4 = GPIO_OUT | GPIO_DOWN;
     // EC_RSMRST#
@@ -164,7 +164,7 @@ void gpio_init() {
     // 80CLK
     GPCRF0 = GPIO_IN;
     // USB_CHARGE_EN
-    GPCRF1 = GPIO_OUT | GPIO_UP;
+    GPCRF1 = GPIO_OUT;
     // 3IN1
     GPCRF2 = GPIO_IN | GPIO_UP;
     // NC
@@ -175,8 +175,8 @@ void gpio_init() {
     GPCRF5 = GPIO_ALT;
     // H_PECI
     GPCRF6 = GPIO_ALT;
-    //TODO: CC_EN
-    GPCRF7 = GPIO_IN | GPIO_UP;
+    // CC_EN
+    GPCRF7 = GPIO_OUT;
     // VCCIN_AUX_PG
     GPCRG0 = GPIO_IN;
     // WLAN_EN

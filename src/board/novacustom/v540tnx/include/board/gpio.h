@@ -48,5 +48,8 @@ extern struct Gpio __code VA_EC_EN;
 #define HAVE_WLAN_EN 0
 extern struct Gpio __code WLAN_PWR_EN;
 extern struct Gpio __code XLP_OUT;
+#define HAVE_USB_CHARGE_EN 1
+extern struct Gpio __code USB_CHARGE_EN;
+extern struct Gpio __code USB_PWR_EN_N;
 
 #endif // _BOARD_GPIO_H

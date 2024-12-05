@@ -93,6 +93,15 @@
 #define HAVE_PD_EN 0
 #endif
 
+// Disable by default
+#ifndef HAVE_USB_CHARGE_EN
+#define HAVE_USB_CHARGE_EN 0
+#endif
+
+#ifndef HAVE_CC_EN
+#define HAVE_CC_EN 0
+#endif
+
 #ifndef HAVE_XLP_OUT
 #define HAVE_XLP_OUT 1
 #endif
@@ -201,6 +210,54 @@ void update_power_state(void) {
     }
 }
 
+static void configure_usb_port_power(bool powering_on, bool ac_change) {
+    bool usb_port_power;
+    static bool usb_port_power_last = false;
+    uint8_t usb_power_opt = options_get(OPT_USB_POWER);
+
+    if (usb_power_opt > USB_POWER_ON_AC)
+        usb_power_opt = USB_POWER_ON_IN_S0;
+
+    usb_port_power = (usb_power_opt == USB_POWER_ALWAYS_ON);
+
+    update_power_state();
+
+    if (powering_on) {
+        usb_port_power = true;
+    } else if (ac_change) {
+        // If we change AC state, only change USB port power in the powered
+        // off/S5 state
+        if (power_state == POWER_STATE_OFF || power_state == POWER_STATE_S5) {
+            if (usb_power_opt == USB_POWER_ON_AC)
+                usb_port_power = !gpio_get(&ACIN_N);
+        } else {
+            usb_port_power = usb_port_power_last;
+        }
+    } else {
+        if (usb_power_opt == USB_POWER_ON_IN_S0)
+            usb_port_power = false;
+        else if (usb_power_opt == USB_POWER_ON_AC)
+            usb_port_power = !gpio_get(&ACIN_N);
+    }
+
+    if (usb_port_power_last != usb_port_power) {
+        usb_port_power_last = usb_port_power;
+
+#if HAVE_USB_CHARGE_EN
+        // Enables VDD5 (like DD_ON), but does not enable 3.3V
+        GPIO_SET_DEBUG(USB_CHARGE_EN, usb_port_power);
+#endif
+        GPIO_SET_DEBUG(USB_PWR_EN_N, usb_port_power);
+#if HAVE_CC_EN
+        // CC_EN controls USB Type-C port power
+        GPIO_SET_DEBUG(CC_EN, usb_port_power);
+#endif
+#if HAVE_PD_EN
+        GPIO_SET_DEBUG(PD_EN, usb_port_power);
+#endif
+    }
+}
+
 void power_init(void) {
     // See Figure 12-19 in Whiskey Lake Platform Design Guide
     // | VCCRTC | RTCRST# | VccPRIM |
@@ -211,6 +268,11 @@ void power_init(void) {
     tPCH04;
 
     update_power_state();
+
+    // Set USB power accordign to option. Must be called when AC is being
+    // plugged while powered off, otherwise one would have to press a power
+    // button to make effect.
+    configure_usb_port_power(false, false);
 }
 
 void power_on(void) {
@@ -236,6 +298,9 @@ void power_on(void) {
 
     // Enable VDD5
     GPIO_SET_DEBUG(DD_ON, true);
+
+    // Configure USB port power before powering on
+    configure_usb_port_power(true, false);
 
 #if HAVE_SUS_PWR_ACK
     // De-assert SUS_ACK# - TODO is this needed on non-dsx?
@@ -339,6 +404,8 @@ void power_off(void) {
     // Configure WLAN GPIOs after powering off
     wireless_power(false);
 
+    configure_usb_port_power(false, false);
+
     update_power_state();
 }
 
@@ -429,6 +496,7 @@ void power_event(void) {
             GPIO_SET_DEBUG(H_PROCHOT_EC, false);
             ac_unplug_time = time_get();
             battery_charger_disable();
+            configure_usb_port_power(false, true);
         } else {
             DEBUG("plugged in\n");
             battery_charger_configure();
@@ -438,6 +506,7 @@ void power_event(void) {
                     power_on();
                     break;
                 case POWER_STATE_S5:
+                    configure_usb_port_power(true, true);
                     GPIO_SET_DEBUG(PWR_BTN_N, false);
                     delay_ms(32); // PWRBTN# must assert for at least 16 ms, we do twice that
                     GPIO_SET_DEBUG(PWR_BTN_N, true);
@@ -445,6 +514,8 @@ void power_event(void) {
                 default:
                     break;
                 }
+            } else {
+                configure_usb_port_power(false, true);
             }
         }
         power_apply_limit(!ac_new);
@@ -682,15 +753,21 @@ void power_event(void) {
     } else {
         // CPU off and AC adapter unplugged, flashing orange light
         gpio_set(&LED_PWR, false);
-        if ((time - last_time) >= 1000) {
-            gpio_set(&LED_ACIN, !gpio_get(&LED_ACIN));
-            last_time = time;
-        }
 
+        // Don't blink if we have USB power enabled, because we can't
+        // unset XLP_OUT to keep USB powered
+        if (options_get(OPT_USB_POWER) == USB_POWER_ON_IN_S0) {
+            if ((time - last_time) >= 1000) {
+                gpio_set(&LED_ACIN, !gpio_get(&LED_ACIN));
+                last_time = time;
+            }
 #if HAVE_XLP_OUT
-        // Power off VDD3 if system should be off
-        gpio_set(&XLP_OUT, 0);
+            // Power off VDD3 if system should be off
+            gpio_set(&XLP_OUT, 0);
 #endif // HAVE_XLP_OUT
+        } else {
+            gpio_set(&LED_ACIN, false);
+        }
     }
 
 //TODO: do not require both LEDs
