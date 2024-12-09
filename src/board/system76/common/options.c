@@ -15,10 +15,11 @@ uint8_t DEFAULT_OPTIONS[NUM_OPTIONS] = {
     [OPT_BAT_THRESHOLD_START] = 95,
     [OPT_BAT_THRESHOLD_STOP] = 98,
     [OPT_ALLOW_BAT_BOOST] = 0,
+    [OPT_USB_POWER] = 0,
 };
 // clang-format on
 
-#define SAVE_IMMEDIATELY BIT(OPT_POWER_ON_AC)
+#define SAVE_IMMEDIATELY (BIT(OPT_POWER_ON_AC) || BIT(OPT_USB_POWER))
 
 // Config is in the second to last sector of flash
 const uint32_t OPTIONS_ADDR = 0x1F800;
