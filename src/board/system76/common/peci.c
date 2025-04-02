@@ -413,6 +413,77 @@ int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data) {
     return -((int16_t)cc);
 }
 
+int16_t peci_rd_ia_msr(uint16_t msr, uint64_t *value) {
+    int retry = 50; // TODO how many retries are appropriate?
+    uint8_t cc = HORDDR;
+    uint64_t ret = 0;
+
+    // Wait for any in-progress transaction to complete
+    while (HOSTAR & BIT(0)) {}
+    do {
+        // Clear status
+        HOSTAR = HOSTAR;
+
+        // Enable PECI, clearing data fifo's, enable AW_FCS
+        HOCTLR = BIT(5) | BIT(3) | BIT(1);
+        // Set address to default
+        HOTRADDR = 0x30;
+        // Set write length
+        HOWRLR = 5;
+        // Set read length
+        HORDLR = 9;
+        // Set command
+        HOCMDR = 0xB1;
+
+        // Write host ID
+        HOWRDR = 0;
+        // Write processor ID
+        HOWRDR = 0;
+        // Write param
+        HOWRDR = (uint8_t)msr;
+        HOWRDR = (uint8_t)(msr >> 8);
+
+        // Start transaction
+        HOCTLR |= 1;
+
+        // Wait for command completion
+        while (!(HOSTAR & BIT(1))) {}
+
+        uint8_t status = HOSTAR;
+        if (status & 0xEC) {
+            ERROR("peci_rd_ia_msr: hardware error: 0x%02X\n", status);
+            // Clear status
+            HOSTAR = HOSTAR;
+            return -(0x1000 | status);
+        }
+
+        cc = HORDDR;
+
+        // Clear status
+        HOSTAR = HOSTAR;
+
+        if (cc == 0x40) {
+            TRACE("peci_rd_ia_msr: command successful\n");
+            return cc;
+        }
+
+    } while (cc == 0x80 || cc == 0x81 || cc == 0x82 || !retry--);
+
+    if (cc & 0xEC) {
+        ERROR("peci_rd_ia_msr: hardware error: 0x%02X\n", cc);
+        return -((int16_t) cc);
+    } else {
+        *value = 0;
+        // Read MSR data if finished successfully
+        for (int i = 0; i < 8; ++i)
+            *value |= (HORDDR << (8 * i));
+
+        // Clear status
+        HOSTAR = HOSTAR;
+        return 0;
+    }
+}
+
 #endif // CONFIG_PECI_OVER_ESPI
 
 // PECI information can be found here: https://www.intel.com/content/dam/www/public/us/en/documents/design-guides/core-i7-lga-2011-guide.pdf
