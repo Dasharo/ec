@@ -141,43 +141,40 @@ uint8_t pep_hook = PEP_DISPLAY_FLAG;
 
 enum PowerState calculate_power_state(void) {
     if (!gpio_get(&USB_CHARGE_EN)) {
-        // VDD5, VccPRIM not powered
         return POWER_STATE_G3;
     }
 
     if (!gpio_get(&EC_RSMRST_N)) {
-        // S5 plane not powered
         return POWER_STATE_G3_AOU;
     }
 
 #if CONFIG_BUS_ESPI
-    // Use eSPI virtual wires if available
-
     if (vw_get(&VW_SLP_S4_N) != VWS_HIGH) {
-        // S4 plane not powered
+        // S4 deasserted → S5
         return POWER_STATE_S5;
     }
 
     if (vw_get(&VW_SLP_S3_N) != VWS_HIGH) {
-        // S3 plane not powered
-        return POWER_STATE_S3;
+        // S3 deasserted → S4
+        return POWER_STATE_S4;
     }
-#else // CONFIG_BUS_ESPI
-    // Use dedicated GPIOs if not using ESPI
 
+    // S3, S4 are HIGH → we're in S0
+    return POWER_STATE_S0;
+
+#else // CONFIG_BUS_ESPI
     if (!gpio_get(&SUSC_N_PCH)) {
-        // S4 plane not powered
+        // S4 deasserted → S5
         return POWER_STATE_S5;
     }
 
     if (!gpio_get(&SUSB_N_PCH)) {
-        // S3 plane not powered
-        return POWER_STATE_S3;
+        // S3 deasserted → S4
+        return POWER_STATE_S4;
     }
-#endif // CONFIG_BUS_ESPI
 
-    // All planes are powered
     return POWER_STATE_S0;
+#endif
 }
 
 void update_power_state(void) {
