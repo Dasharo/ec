@@ -222,6 +222,10 @@ static bool is_standby_power_needed(void) {
     if (options_get(OPT_ALWAYS_ON_USB))
         return true;
 
+    // Keep USB power on to avoid glitching the PD controller
+    if (!gpio_get(&ACIN_N))
+        return true;
+
     return false;
 }
 
@@ -406,14 +410,10 @@ static void power_sequence(enum PowerState target) {
 }
 
 void power_on(void) {
-    DEBUG("%02X: power_on\n", main_cycle);
-
     power_sequence(POWER_STATE_S0);
 }
 
 void power_off(void) {
-    DEBUG("%02X: power_off\n", main_cycle);
-
     power_sequence(is_standby_power_needed() ? POWER_STATE_G3_AOU : POWER_STATE_G3);
 }
 
@@ -516,6 +516,9 @@ void power_event(void) {
             GPIO_SET_DEBUG(H_PROCHOT_EC, false);
             ac_unplug_time = time_get();
             battery_charger_disable();
+            // USB power may have been kept to prevent PDC glitch
+            if (power_state == POWER_STATE_G3_AOU)
+                power_off();
         } else {
             DEBUG("plugged in\n");
             battery_charger_configure();
@@ -683,7 +686,7 @@ void power_event(void) {
     if (ack_new)
 #endif // HAVE_SUSWARN_N
     {
-        // Disable S5 power plane if not needed
+        // Handle powering off when power not needed
         if (power_state == POWER_STATE_S5) {
             power_off();
 
