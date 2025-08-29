@@ -50,7 +50,7 @@ enum {
     USBPD_MODE_DISC,
     // Other values indicate limited functionality
     USBPD_MODE_UNKNOWN,
-    // An error occured while reading mode
+    // An error occurred while reading mode
     USBPD_MODE_I2C_ERR,
 };
 
