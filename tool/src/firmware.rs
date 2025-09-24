@@ -23,11 +23,6 @@ fn firmware_str<'a>(data: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
         data_i += 1;
     }
 
-    // Return None if key not found
-    if key_i < key.len() {
-        return None;
-    }
-
     // Locate end of data
     let start = data_i;
     while data_i < data.len() {
