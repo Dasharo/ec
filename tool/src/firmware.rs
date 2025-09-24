@@ -15,6 +15,8 @@ fn firmware_str<'a>(data: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
     while data_i < data.len() && key_i < key.len() {
         if data[data_i] == key[key_i] {
             key_i += 1;
+        } else if data[data_i] == key[0] {
+            key_i = 1;
         } else {
             key_i = 0;
         }
