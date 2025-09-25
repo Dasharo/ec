@@ -61,9 +61,14 @@ unsafe fn flash_read<S: Spi>(spi: &mut SpiRom<S, StdTimeout>, rom: &mut [u8], se
 }
 
 unsafe fn flash_inner(ec: &mut Ec<Box<dyn Access>>, firmware: &Firmware, target: SpiTarget, scratch: bool) -> Result<(), Error> {
-    let rom_size = 128 * 1024;
-
     let mut new_rom = firmware.data.to_vec();
+    // FIXME: detect ROM size instead of hardcoding
+    let rom_size = if new_rom.len() > (128 * 1024) {
+        // set rom_size to 256 kB, 512 kB, ...
+        new_rom.len().next_power_of_two()
+    } else {
+        128 * 1024
+    };
     while new_rom.len() < rom_size {
         new_rom.push(0xFF);
     }
@@ -156,6 +161,7 @@ unsafe fn flash(ec: &mut Ec<Box<dyn Access>>, path: &str, target: SpiTarget, for
         println!("ec board: {:?}", str::from_utf8(ec_board));
 
         assert!(force || ec_board == firmware.board, "file board does not match ec board");
+        assert!(force || firmware.data.len() <= (128 * 1024), "ec binary size is greater than 128 kB");
     }
 
     {
