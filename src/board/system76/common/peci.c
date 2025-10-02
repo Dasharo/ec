@@ -17,7 +17,7 @@
 
 // Fan speed is the lowest requested over HEATUP seconds
 #ifndef BOARD_HEATUP
-#define BOARD_HEATUP 4
+#define BOARD_HEATUP 12
 #endif
 
 static uint8_t FAN_HEATUP[BOARD_HEATUP] = { 0 };

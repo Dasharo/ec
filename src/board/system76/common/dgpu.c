@@ -17,7 +17,7 @@
 
 // Fan speed is the lowest requested over HEATUP seconds
 #ifndef BOARD_DGPU_HEATUP
-#define BOARD_DGPU_HEATUP 4
+#define BOARD_DGPU_HEATUP 12
 #endif
 
 static uint8_t FAN_HEATUP[BOARD_DGPU_HEATUP] = { 0 };
