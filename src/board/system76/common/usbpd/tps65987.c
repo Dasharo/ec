@@ -333,15 +333,25 @@ void usbpd_event(void) {
                 next_input_voltage = BATTERY_CHARGER_VOLTAGE_AC;
             } else if (sink_ctrl_1) {
                 while ((res = usbpd_current_limit(PORT_A_ADDRESS)) < 0 && retry--) {};
-                next_input_current = res < CHARGER_INPUT_CURRENT ? res : CHARGER_INPUT_CURRENT;
-                next_input_current = (uint32_t)next_input_current * 85 / 100;
-                next_input_voltage = BATTERY_CHARGER_VOLTAGE_PD;
+                if (res >= 0) {
+                    next_input_current = res < CHARGER_INPUT_CURRENT ? res : CHARGER_INPUT_CURRENT;
+                    next_input_current = (uint32_t)next_input_current * 85 / 100;
+                    next_input_voltage = BATTERY_CHARGER_VOLTAGE_PD;
+                } else {
+                    next_input_current = CHARGER_INPUT_CURRENT;
+                    next_input_voltage = BATTERY_CHARGER_VOLTAGE_AC;
+                }
 #ifdef USBPD_DUAL_PORT
             } else if (sink_ctrl_2) {
                 while ((res = usbpd_current_limit(PORT_B_ADDRESS)) < 0 && retry--) {};
-                next_input_current = res < CHARGER_INPUT_CURRENT ? res : CHARGER_INPUT_CURRENT;
-                next_input_current = (uint32_t)next_input_current * 85 / 100;
-                next_input_voltage = BATTERY_CHARGER_VOLTAGE_PD;
+                if (res >= 0) {
+                    next_input_current = res < CHARGER_INPUT_CURRENT ? res : CHARGER_INPUT_CURRENT;
+                    next_input_current = (uint32_t)next_input_current * 85 / 100;
+                    next_input_voltage = BATTERY_CHARGER_VOLTAGE_PD;
+                } else {
+                    next_input_current = CHARGER_INPUT_CURRENT;
+                    next_input_voltage = BATTERY_CHARGER_VOLTAGE_AC;
+                }
 #endif
             }
         }
