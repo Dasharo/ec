@@ -473,6 +473,8 @@ void power_cpu_reset(void) {
     // Set GPIO MUX_CTRL_BIOS to choose between iGPU and dGPU
     set_mux_ctrl();
 #endif //HAVE_DGPU
+    // Reset USB-PD device
+    usbpd_reset();
     // LPC was just reset, enable PNP devices
     pnp_enable();
     // Reset ACPI registers
