@@ -7,7 +7,7 @@ pub struct Firmware<'a> {
     pub data: &'a [u8],
 }
 
-fn firmware_str<'a>(data: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
+fn firmware_str<'a>(data: &'a [u8], key: &[u8]) -> &'a [u8] {
     let mut data_i = 0;
 
     //First, locate the key
@@ -32,14 +32,14 @@ fn firmware_str<'a>(data: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
         data_i += 1;
     }
 
-    Some(&data[start..data_i])
+    &data[start..data_i]
 }
 
 impl<'a> Firmware<'a> {
     /// Parses firmware board and version, and then returns firmware object
     pub fn new(data: &'a [u8]) -> Option<Self> {
-        let board = firmware_str(data, b"76EC_BOARD=")?;
-        let version = firmware_str(data, b"76EC_VERSION=")?;
+        let board = firmware_str(data, b"76EC_BOARD=");
+        let version = firmware_str(data, b"76EC_VERSION=");
         Some(Self {
             data,
             board,
