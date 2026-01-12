@@ -38,6 +38,7 @@ elif [[ "${ID}" =~ "fedora" ]] || [[ "${ID_LIKE}" =~ "fedora" ]]; then
         avr-libc \
         avrdude \
         clang-tools-extra \
+        hidapi-devel \
         curl \
         gcc \
         make \
