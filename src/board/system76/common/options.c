@@ -25,13 +25,13 @@ const uint32_t OPTIONS_ADDR = 0x1F800;
 // Signature is the size of the config
 const uint16_t OPTIONS_SIGNATURE = sizeof(OPTIONS);
 
-void options_reset() {
+void options_reset(void) {
     for (uint8_t opt = 0; opt < NUM_OPTIONS; opt++) {
         OPTIONS[opt] = DEFAULT_OPTIONS[opt];
     }
 }
 
-static bool options_load_config() {
+static bool options_load_config(void) {
     // Check signature
     if (flash_read_u16(OPTIONS_ADDR) != OPTIONS_SIGNATURE)
         return false;
@@ -55,7 +55,7 @@ void options_init(void) {
     }
 }
 
-static bool options_changed() {
+static bool options_changed(void) {
     uint8_t current[NUM_OPTIONS];
     // Check if anything changed
     if (flash_read_u16(OPTIONS_ADDR) != OPTIONS_SIGNATURE) {

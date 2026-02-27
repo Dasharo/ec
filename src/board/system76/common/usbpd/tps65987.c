@@ -207,7 +207,7 @@ static void usbpd_set_multiport_policy(void) {
     DEBUG("USBPD multiport policy set RES = %ld\n", res);
 }
 
-static void usbpd_clear_event() {
+static void usbpd_clear_event(void) {
     int16_t res;
     uint8_t reg[12] = { 0 };
 
@@ -234,7 +234,7 @@ static void usbpd_clear_event() {
 
 // Check the operational mode of the PDC and kick it if it has been in a bad
 // mode for over 1 second.
-static void usbpd_check_mode() {
+static void usbpd_check_mode(void) {
     static uint32_t time_start = 0;
 
     if (power_state != POWER_STATE_G3 && usbpd_get_mode() == USBPD_MODE_UNKNOWN && !time_start)
