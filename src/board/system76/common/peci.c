@@ -61,13 +61,14 @@ static struct Fan FAN = {
     .interpolate = SMOOTH_FANS != 0,
 };
 
-int16_t peci_set_fan_curve(uint8_t count, struct FanPoint *points) {
+int16_t peci_set_fan_curve(uint8_t count, struct FanPoint *points) __reentrant {
+    int i;
     if (count != FAN.points_size) {
         TRACE("PECI: Incorrect number of fan points: %d, expected %d\n", count, FAN.points_size);
         return -1;
     }
 
-    for (int i = 0; i < count; ++i) {
+    for (i = 0; i < count; ++i) {
         TRACE("PECI: fan curve t%d: %d, d%d: %d\n", i, points[i].temp, i, points[i].duty);
         FAN.points[i].temp = points[i].temp;
         FAN.points[i].duty = points[i].duty;
@@ -347,9 +348,10 @@ bool peci_get_temp(int16_t *data) {
 
 // Returns positive completion code on success, negative completion code or
 // negative (0x1000 | status register) on PECI hardware error
-int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data) {
+int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data) __reentrant {
     int retry = 50; // TODO how many retries are appropriate?
     uint8_t cc = HORDDR;
+    uint8_t status;
 
     // Wait for any in-progress transaction to complete
     while (HOSTAR & BIT(0)) {}
@@ -387,7 +389,7 @@ int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data) {
         // Wait for command completion
         while (!(HOSTAR & BIT(1))) {}
 
-        uint8_t status = HOSTAR;
+        status = HOSTAR;
         if (status & 0xEC) {
             ERROR("peci_wr_pkg_config: hardware error: 0x%02X\n", status);
             // Clear status
@@ -411,9 +413,11 @@ int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data) {
     return -((int16_t)cc);
 }
 
-int16_t peci_rd_pkg_config(uint8_t index, uint16_t param, uint32_t *value) {
+int16_t peci_rd_pkg_config(uint8_t index, uint16_t param, uint32_t *value) __reentrant {
     int retry = 50; // TODO how many retries are appropriate?
     uint8_t cc = HORDDR;
+    uint8_t status;
+    int i;
     *value = 0;
 
     // Wait for any in-progress transaction to complete
@@ -447,7 +451,7 @@ int16_t peci_rd_pkg_config(uint8_t index, uint16_t param, uint32_t *value) {
         // Wait for command completion
         while (!(HOSTAR & BIT(1))) {}
 
-        uint8_t status = HOSTAR;
+        status = HOSTAR;
         if (status & 0xEC) {
             ERROR("peci_rd_pkg_config: hardware error: 0x%02X\n", status);
             // Clear status
@@ -466,7 +470,7 @@ int16_t peci_rd_pkg_config(uint8_t index, uint16_t param, uint32_t *value) {
         return -((int16_t)cc);
     } else {
         // Read data if finished successfully
-        for (int i = 0; i < 4; ++i) {
+        for (i = 0; i < 4; ++i) {
             *value |= (((uint32_t)HORDDR) << (8 * i));
         }
 
