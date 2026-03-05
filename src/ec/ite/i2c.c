@@ -95,7 +95,12 @@ void i2c_stop(struct I2C *i2c) {
     i2c_reset(i2c, false);
 }
 
-static int16_t i2c_transaction(struct I2C *i2c, uint8_t *data, uint16_t length, bool read) {
+static int16_t i2c_transaction(
+    struct I2C *i2c,
+    uint8_t *data,
+    uint16_t length,
+    bool read
+) __reentrant {
     uint16_t i;
     for (i = 0; i < length; i++) {
         if (read) {

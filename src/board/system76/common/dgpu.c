@@ -94,13 +94,14 @@ uint8_t dgpu_get_d_notify_level(bool ac) {
     return 0;
 }
 
-int16_t dgpu_set_fan_curve(uint8_t count, struct FanPoint *points) {
+int16_t dgpu_set_fan_curve(uint8_t count, struct FanPoint *points) __reentrant {
+    int i;
     if (count != FAN.points_size) {
         TRACE("DGPU: Incorrect number of fan points: %d, expected %d\n", count, FAN.points_size);
         return -1;
     }
 
-    for (int i = 0; i < count; ++i) {
+    for (i = 0; i < count; ++i) {
         TRACE("DGPU: fan curve t%d: %d, d%d: %d\n", i, points[i].temp, i, points[i].duty);
         FAN.points[i].temp = points[i].temp;
         FAN.points[i].duty = points[i].duty;

@@ -29,9 +29,9 @@ extern uint8_t t_junction;
 
 void peci_init(void);
 bool peci_available(void);
-int16_t peci_set_fan_curve(uint8_t count, struct FanPoint *points);
-int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data);
-int16_t peci_rd_pkg_config(uint8_t index, uint16_t param, uint32_t *value);
+int16_t peci_set_fan_curve(uint8_t count, struct FanPoint *points) __reentrant;
+int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data) __reentrant;
+int16_t peci_rd_pkg_config(uint8_t index, uint16_t param, uint32_t *value) __reentrant;
 uint8_t peci_get_fan_duty(void);
 
 #endif // _BOARD_PECI_H
