@@ -10,9 +10,11 @@
 #include <board/board.h>
 #include <board/dgpu.h>
 #include <board/ecpm.h>
+#include <board/espi.h>
 #include <board/fan.h>
 #include <board/gpio.h>
 #include <board/gctrl.h>
+#include <board/irq.h>
 #include <board/kbc.h>
 #include <board/kbled.h>
 #include <board/kbscan.h>
@@ -31,24 +33,237 @@
 #include <common/macro.h>
 #include <common/version.h>
 #include <ec/ec.h>
+#include <ec/intc.h>
+#include <ec/kbscan.h>
 
 #ifdef PARALLEL_DEBUG
 #include <board/parallel.h>
 #endif // PARALLEL_DEBUG
 
+// --------------------------------------------------------------------------
+// SINK_CTRL interrupt routing. Boards override SINK_CTRL_IRQ in gpio.h
+// if SINK_CTRL is not on GPC3 (e.g. GPH7 on v560tnx/v540tnx → IRQ 148).
+// WUC/IER/ISR registers are derived automatically from the GPIO struct.
+// --------------------------------------------------------------------------
+#ifndef HAVE_SINK_CTRL
+#define HAVE_SINK_CTRL 0
+#endif
+
+// Default IRQ for GPC3 (nv40mz, galp5, galp6): WU108, Group 11 bit 4, INT113
+#ifndef SINK_CTRL_IRQ
+#define SINK_CTRL_IRQ   _GPIO_WUC_IRQ_C3   // 113
+#endif
+
+// --------------------------------------------------------------------------
+// Default interrupt routing for JACK_IN_N (boards can override in gpio.h)
+// GPC6 = WUEMR2[3] -> INT6 = IER0[6]
+// --------------------------------------------------------------------------
+#ifndef HAVE_JACK_IN_N
+#define HAVE_JACK_IN_N 0
+#endif
+
+// --------------------------------------------------------------------------
+// Pending flags — set by external_1 ISR, cleared by main loop handlers.
+// kbscan_irq_pending and kbscan_matrix[] are defined in kbscan.c.
+// dgpu_irq_pending is defined in dgpu.c.
+// --------------------------------------------------------------------------
+volatile bool power_irq_pending = false;
+volatile bool lid_irq_pending   = false;
+volatile bool smfi_irq_pending  = false;
+volatile bool kbc_irq_pending   = false;
+volatile bool pmc_irq_pending   = false;
+volatile bool espi_irq_pending  = false;
+
 void external_0(void) __interrupt(0) {}
 // timer_0 is in time.c
 void timer_0(void) __interrupt(1);
-void external_1(void) __interrupt(2) {}
 void timer_1(void) __interrupt(3) {}
 void serial(void) __interrupt(4) {}
 void timer_2(void) __interrupt(5) {}
 
+static volatile uint8_t last_irq = 0;
+
+// --------------------------------------------------------------------------
+// external_1 ISR: dispatches INTC interrupts to pending flags
+// --------------------------------------------------------------------------
+void external_1(void) __interrupt(2) {
+    uint8_t irq = intc_get_irq();
+    last_irq = irq;
+    switch (irq) {
+#if HAVE_JACK_IN_N
+    case _GPIO_WUC_IRQ_C6:  // JACK_IN_N (GPC6 → INT6)
+        gpio_irq_ack(&JACK_IN_N);
+        power_irq_pending = true;
+        break;
+#endif
+    case _GPIO_WUC_IRQ_B3:  // PWR_SW_N (GPB3 → INT14)
+        gpio_irq_ack(&PWR_SW_N);
+        power_irq_pending = true;
+        break;
+    case _GPIO_WUC_IRQ_D2:  // BUF_PLT_RST_N (GPD2 → INT17)
+        gpio_irq_ack(&BUF_PLT_RST_N);
+        power_irq_pending = true;
+        break;
+    case 22:  // SMFI semaphore (INT22 = IER2[6])
+        ISR2 = BIT(6); // write-1-to-clear: unblock IVCT for other pending IRQs
+        smfi_irq_pending = true;
+        break;
+    case 24:  // KBC IBF (INT24 = IER3[0])
+        ISR3 = BIT(0); // clear edge-triggered ISR latch so INT24 doesn't lock out lower IRQs
+        kbc_irq_pending = true;
+        break;
+    case 25:  // PMC1 IBF (INT25 = IER3[1])
+        ISR3 = BIT(1);
+        pmc_irq_pending = true;
+        break;
+#if HAVE_PD_IRQ
+    case _GPIO_WUC_IRQ_E2:  // PD_IRQ (GPE2 → INT74)
+        gpio_irq_ack(&PD_IRQ);
+        power_irq_pending = true;
+        break;
+#endif
+    case 84:  // KSM scan data valid (INT84 = IER10[4])
+        {
+            uint8_t c;
+            for (c = 0; c < KM_OUT; c++)
+                kbscan_matrix[c] = ~KSO_LSDR[c]; // invert: 1=pressed
+        }
+        SDSR = BIT(0);   // clear SDV (write-1-to-clear)
+        ISR10 = BIT(4);  // clear ISR latch
+        kbscan_irq_pending = true;
+        break;
+#if HAVE_DGPU
+    case _GPIO_WUC_IRQ_H4:  // DGPU_PWR_EN (GPH4 → INT85, WU88 Group 9 bit 0)
+        gpio_irq_ack(&DGPU_PWR_EN);
+        dgpu_irq_pending = true;
+        break;
+#endif
+#if HAVE_LAN_WAKEUP_N
+    case _GPIO_WUC_IRQ_B2:  // LAN_WAKEUP_N (GPB2 → INT92)
+        gpio_irq_ack(&LAN_WAKEUP_N);
+        power_irq_pending = true;
+        break;
+#endif
+    case _GPIO_WUC_IRQ_C0:  // ALL_SYS_PWRGD (GPC0 → INT93)
+        gpio_irq_ack(&ALL_SYS_PWRGD);
+        power_irq_pending = true;
+        break;
+    case _GPIO_WUC_IRQ_B0:  // ACIN_N (GPB0 → INT106, WU101 Group 10 bit 5)
+        gpio_irq_ack(&ACIN_N);
+        power_irq_pending = true;
+        break;
+    case _GPIO_WUC_IRQ_B1:  // LID_SW_N (GPB1 → INT107, WU102 Group 10 bit 6)
+        gpio_irq_ack(&LID_SW_N);
+        lid_irq_pending = true;
+        break;
+#if HAVE_SINK_CTRL
+    case SINK_CTRL_IRQ:  // SINK_CTRL (board-specific pin → IRQ from gpio_wuc.h)
+        gpio_irq_ack(&SINK_CTRL);
+        power_irq_pending = true;
+        break;
+#endif
+#if HAVE_DGPU
+    case _GPIO_WUC_IRQ_J3:  // GC6_FB_EN (GPJ3 → INT131)
+        gpio_irq_ack(&GC6_FB_EN);
+        dgpu_irq_pending = true;
+        break;
+#endif
+#if HAVE_SLP_SUS_N
+    case _GPIO_WUC_IRQ_J7:  // SLP_SUS_N (GPJ7 → INT135)
+        gpio_irq_ack(&SLP_SUS_N);
+        power_irq_pending = true;
+        break;
+#endif
+#if CONFIG_BUS_ESPI
+    case 154: // eSPI VW (INT154 = IER19[2])
+        ISR19 = BIT(2); // clear ISR latch
+        espi_irq_pending = true;
+        break;
+#endif
+    case 159: // PLL Frequency Change Event (edge-triggered, always-enabled)
+        ISR19 = BIT(7); // write-1-to-clear: unblock IVCT for other pending IRQs
+        break;
+    }
+}
+
 uint8_t main_cycle = 0;
-const uint16_t battery_interval = 1000;
-// update fan speed more frequently for smoother fans
-// NOTE: event loop is longer than 100ms and maybe even longer than 250
-const uint16_t fan_interval = SMOOTH_FANS != 0 ? 250 : 1000;
+
+// --------------------------------------------------------------------------
+// intc_init: configure WUC edge detection and enable IER bits
+// --------------------------------------------------------------------------
+static void intc_init(void) {
+    // Clear all IER registers for a clean slate (prevents stale bits from
+    // power-up or previous firmware, including IER19[7] = IRQ159 if maskable)
+    IER0 = 0; IER1 = 0; IER2 = 0; IER3 = 0;
+    IER4 = 0; IER5 = 0; IER6 = 0; IER7 = 0;
+    IER8 = 0; IER9 = 0; IER10 = 0; IER11 = 0;
+    IER12 = 0; IER13 = 0; IER14 = 0; IER15 = 0;
+    IER16 = 0; IER17 = 0; IER18 = 0;
+#if CONFIG_EC_ITE_IT5570E
+    IER19 = 0; IER20 = 0; IER21 = 0;
+#endif
+
+    // GPIO edge-detect interrupts: WUC/IER registers derived from struct Gpio fields.
+    // gpio_irq_enable() sets rising edge initially, clears WUESR, and enables IER bit.
+
+#if HAVE_JACK_IN_N
+    gpio_irq_enable(&JACK_IN_N);
+#endif
+
+    gpio_irq_enable(&PWR_SW_N);
+    gpio_irq_enable(&BUF_PLT_RST_N);
+
+#if HAVE_PD_IRQ
+    gpio_irq_enable(&PD_IRQ);
+#endif
+
+    // INT84: KSM scan data valid. Clear any stale SDV before enabling IER so
+    // the INTC sees a clean rising edge when the first scan completes.
+    IER10 |= BIT(4);
+    SDSR = BIT(0);
+
+#if HAVE_DGPU
+    gpio_irq_enable(&DGPU_PWR_EN);
+    gpio_irq_enable(&GC6_FB_EN);
+#endif
+
+#if HAVE_LAN_WAKEUP_N
+    gpio_irq_enable(&LAN_WAKEUP_N);
+#endif
+
+    gpio_irq_enable(&ALL_SYS_PWRGD);
+    gpio_irq_enable(&ACIN_N);
+
+    // LID_SW_N: enable interrupt then set initial edge from current lid state
+    // so the first transition (open→close or close→open) is not missed.
+    gpio_irq_enable(&LID_SW_N);
+    if (gpio_get(&LID_SW_N)) {
+        // Lid open (GPIO=1): override to falling edge to detect lid close.
+        volatile uint8_t __xdata *wuemr = gpio_wuemr(LID_SW_N.wuc_group);
+        if (wuemr) *wuemr &= ~BIT(LID_SW_N.wuc_bit);
+        // lid closed: rising edge (detect open) already set by gpio_irq_enable
+    }
+
+#if HAVE_SINK_CTRL
+    gpio_irq_enable(&SINK_CTRL);
+#endif
+
+#if HAVE_SLP_SUS_N
+    gpio_irq_enable(&SLP_SUS_N);
+#endif
+
+    // Non-GPIO interrupts (no WUC): enable IER bits directly.
+    IER2 |= BIT(6);         // SMFI semaphore (INT22)
+    IER3 |= BIT(0) | BIT(1); // KBC IBF (INT24), PMC1 IBF (INT25)
+
+    // eSPI VW (INT154 = IER19[2])
+#if CONFIG_BUS_ESPI
+    IER19 |= BIT(2);
+#endif
+
+    // Enable 8051 external interrupt 1 (EX1 bit in IE register)
+    IE |= 0x04;
+}
 
 void init(void) {
     // Must happen first
@@ -83,11 +298,15 @@ void init(void) {
     usbpd_init();
     ps2_init();
 
-    //TODO: INTC
+    intc_init();
 
     // Must happen last
     power_init();
     board_init();
+
+    // Read actual lid state at boot (lid_state defaults to false/closed;
+    // the WUC edge interrupt only fires on change, not initial state)
+    lid_event();
 }
 
 void main(void) {
@@ -102,62 +321,95 @@ void main(void) {
     INFO("System76 EC board '%s', version '%s'\n", board(), version());
     ec_print_reset_reason();
 
-    uint32_t last_time_battery = 0;
-    uint32_t last_time_fan = 0;
-
     for (main_cycle = 0;; main_cycle++) {
-        switch (main_cycle % 3U) {
-        case 0:
-            // Handle USB-C events immediately before power states
+        // Idle until next interrupt (~1ms timer_0 or INTC wakeup)
+        PCON |= 1;
+        if (last_irq) {
+            DEBUG("IRQ %u\n", last_irq);
+            last_irq = 0;
+        }
+
+        // Power/USB-PD GPIO edges: run usbpd_event then power_event
+        // (USB-PD must precede power, matching original call order)
+        if (power_irq_pending) {
+            power_irq_pending = false;
             usbpd_event();
-
-            // Handle power states
             power_event();
-            break;
-        case 1:
-#if PARALLEL_DEBUG
-            if (!parallel_debug)
-#endif // PARALLEL_DEBUG
-            {
-                // Scans keyboard and sends keyboard packets
-                kbscan_event();
-            }
-            break;
-        case 2:
-            // Handle lid close/open
+        }
+
+        if (lid_irq_pending) {
+            lid_irq_pending = false;
             lid_event();
-            break;
         }
 
-        if (main_cycle == 0) {
-            uint32_t time = time_get();
-            // Only run the following once per interval
-            if ((time - last_time_fan) >= fan_interval) {
-                last_time_fan = time;
+        // No interrupt possible until SMFI Semaphore register is used
+        smfi_event();
 
-                // Update fan speeds
-                fan_duty_set(peci_get_fan_duty(), dgpu_get_fan_duty());
-            }
+        // Always poll kbc_event (diagnostic: like master branch)
+        kbc_irq_pending = false;
+        kbc_event(&KBC);
 
-            // Only run the following once per interval
-            if ((time - last_time_battery) >= battery_interval) {
-                last_time_battery = time;
-
-                // Updates battery status
-                battery_event();
-            }
+        if (pmc_irq_pending) {
+            pmc_irq_pending = false;
+            pmc_event(&PMC_1);
         }
+
+#if CONFIG_BUS_ESPI
+        if (espi_irq_pending) {
+            espi_irq_pending = false;
+            espi_event();
+        }
+#endif
+
+        // Keyboard: new scan data (INT84) or key held with repeat pending.
+        // INT84 fires only on scan change, so kbscan_repeat_active keeps
+        // kbscan_event() running via timer_0 (~1ms) while a key is held.
+#ifdef PARALLEL_DEBUG
+        if (!parallel_debug)
+#endif // PARALLEL_DEBUG
+        if (kbscan_irq_pending || kbscan_repeat_active) {
+            kbscan_irq_pending = false;
+            kbscan_event();
+        }
+
+#if HAVE_DGPU
+        if (dgpu_irq_pending) {
+            dgpu_irq_pending = false;
+            // Re-evaluate fan curves when dGPU state changes
+            fan_duty_set(peci_get_fan_duty(), dgpu_get_fan_duty());
+        }
+#endif
 
         // Board-specific events
         board_event();
 
-        // Checks for keyboard/mouse packets from host
-        kbc_event(&KBC);
-        // Handles ACPI communication
-        pmc_event(&PMC_1);
-        // AP/EC communication over SMFI
-        smfi_event();
-        // Idle until next timer interrupt
-        //Disabled until interrupts used: PCON |= 1;
+        // Periodic tasks driven by 50 ms timer_0 flag.
+        // Counters tick at 50 ms each: power=2 (100ms), fan=5 or 20 (250ms or 1000ms),
+        // battery=20 (1000ms). No time_get() needed.
+        if (timer_50ms_pending) {
+            static uint8_t power_ticks = 0;
+            static uint8_t fan_ticks = 0;
+            static uint8_t batt_ticks = 0;
+            timer_50ms_pending = false;
+
+            // Power/usbpd: debounce timeouts, usbpd_check_mode — every 100 ms
+            if (++power_ticks >= 2) {
+                power_ticks = 0;
+                usbpd_event();
+                power_event();
+            }
+
+            // Fan: smooth=250 ms (5 ticks), normal=1000 ms (20 ticks)
+            if (++fan_ticks >= (SMOOTH_FANS != 0 ? 5 : 20)) {
+                fan_ticks = 0;
+                fan_duty_set(peci_get_fan_duty(), dgpu_get_fan_duty());
+            }
+
+            // Battery: every 1000 ms (20 ticks)
+            if (++batt_ticks >= 20) {
+                batt_ticks = 0;
+                battery_event();
+            }
+        }
     }
 }

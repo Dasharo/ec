@@ -11,6 +11,23 @@
 
 #include <stdint.h>
 
+#ifndef BIT
+#define BIT(n) (1U << (n))
+#endif
+
+// Enable WUC edge detection on a pin. WUEMR bit=1 = rising edge, bit=0 = falling edge.
+// WUC_ENABLE sets bit=1 (rising edge); use WUEMR &= ~BIT(n) for falling edge initially.
+#define WUC_ENABLE(wuemr, bit)      ((wuemr) |= BIT(bit))
+// ISR ack for any-edge detection: clear WUESR, toggle edge direction, clear WUESR again.
+// The double-clear prevents spurious re-trigger when toggling WUEMR while the GPIO is
+// already at the new edge's starting level.
+#define WUC_ACK(wuemr, wuesr, bit) \
+    do { \
+        (wuesr) = BIT(bit); \
+        (wuemr) ^= BIT(bit); \
+        (wuesr) = BIT(bit); \
+    } while (0)
+
 volatile uint8_t __xdata __at(0x1B00) WUEMR1;
 volatile uint8_t __xdata __at(0x1B04) WUESR1;
 volatile uint8_t __xdata __at(0x1B08) WUENR1;

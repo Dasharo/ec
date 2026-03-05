@@ -20,6 +20,7 @@ extern struct Gpio __code DD_ON;
 extern struct Gpio __code EC_EN;
 extern struct Gpio __code EC_RSMRST_N;
 extern struct Gpio __code H_PROCHOT_EC;
+#define HAVE_JACK_IN_N 1
 extern struct Gpio __code JACK_IN_N;
 extern struct Gpio __code LAN_WAKEUP_N;
 extern struct Gpio __code LED_ACIN;

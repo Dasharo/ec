@@ -265,7 +265,6 @@ static enum Result cmd_camera_enablement_set(void) {
 
 static enum Result cmd_wifi_bt_enablement_set(void) {
     wireless_power(smfi_cmd[SMFI_CMD_DATA]);
-    TRACE("WIRELESS %sABLED\n", smfi_cmd[SMFI_CMD_DATA] ? "EN" : "DIS");
     return RES_OK;
 }
 

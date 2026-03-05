@@ -16,8 +16,8 @@
 bool pmc_s0_hack = false;
 
 void pmc_init(void) {
-    *(PMC_1.control) = 0x41;
-    *(PMC_2.control) = 0x41;
+    *(PMC_1.control) = 0xc1;
+    *(PMC_2.control) = 0xc1;
 }
 
 enum PmcState {

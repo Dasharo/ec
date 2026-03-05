@@ -41,6 +41,9 @@ volatile uint8_t __xdata __at(0x1D1F) KSO15LSDR;
 volatile uint8_t __xdata __at(0x1D20) KSO16LSDR;
 volatile uint8_t __xdata __at(0x1D21) KSO17LSDR;
 
+// Array overlay for indexed access in ISR (KSO0LSDR..KSO17LSDR)
+volatile uint8_t __xdata __at(0x1D10) KSO_LSDR[18];
+
 volatile uint8_t __xdata __at(0x1D22) SDC1R;
 volatile uint8_t __xdata __at(0x1D23) SDC2R;
 volatile uint8_t __xdata __at(0x1D24) SDC3R;

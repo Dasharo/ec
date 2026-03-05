@@ -2,6 +2,7 @@
 
 #include <board/dgpu.h>
 #include <board/fan.h>
+#include <board/irq.h>
 
 #if HAVE_DGPU
 
@@ -165,3 +166,7 @@ uint8_t dgpu_get_fan_duty(void) {
 }
 
 #endif // HAVE_DGPU
+
+// Defined outside #if HAVE_DGPU so irq.h consumers can always reference it.
+// When HAVE_DGPU=0, main.c's #if HAVE_DGPU guard prevents the ISR case from firing.
+volatile bool dgpu_irq_pending = false;

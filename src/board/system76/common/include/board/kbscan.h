@@ -21,8 +21,14 @@ extern uint16_t kbscan_repeat_period;
 // ms between pressing key and repeating
 extern uint16_t kbscan_repeat_delay;
 
-// Debounced kbscan matrix
-extern uint8_t kbscan_matrix[KM_OUT];
+// Raw scan matrix filled by INT84 ISR from hardware KSM result registers
+extern volatile uint8_t kbscan_matrix[KM_OUT];
+
+// Set by ISR when a new scan result is available
+extern volatile bool kbscan_irq_pending;
+
+// Set by kbscan_event when a key is held with repeat pending
+extern volatile bool kbscan_repeat_active;
 
 void kbscan_init(void);
 void kbscan_event(void);

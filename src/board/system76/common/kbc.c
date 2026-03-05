@@ -10,8 +10,8 @@
 #include <ec/ps2.h>
 
 void kbc_init(void) {
-    // Disable interrupts
-    *(KBC.control) = 0;
+    // Enable interrupts
+    *(KBC.control) = BIT(4) | BIT(3);
 #if CONFIG_BUS_ESPI
     // Set IRQ mode to edge-triggered, 1-cycle pulse width
     *(KBC.irq) = BIT(3);
@@ -173,14 +173,14 @@ static void kbc_clear_output(struct Kbc *kbc) {
 }
 
 static void kbc_on_input_command(struct Kbc *kbc, uint8_t data) {
-    TRACE("kbc cmd: %02X\n", data);
+    DEBUG("kbc cmd: %02X\n", data);
     // Controller commands always reset the state
     state = KBC_STATE_NORMAL;
     // Controller commands clear the output buffer
     kbc_clear_output(kbc);
     switch (data) {
     case 0x20:
-        TRACE("  read configuration byte\n");
+        DEBUG("  read configuration byte\n");
         state = KBC_STATE_KEYBOARD;
         // Interrupt enable flags
         state_data = *kbc->control & 0x03;
@@ -199,57 +199,57 @@ static void kbc_on_input_command(struct Kbc *kbc, uint8_t data) {
         }
         break;
     case 0x60:
-        TRACE("  write configuration byte\n");
+        DEBUG("  write configuration byte\n");
         state = KBC_STATE_WRITE_CONFIG;
         break;
     case 0xA7:
-        TRACE("  disable second port\n");
+        DEBUG("  disable second port\n");
         kbc_second = false;
         break;
     case 0xA8:
-        TRACE("  enable second port\n");
+        DEBUG("  enable second port\n");
         kbc_second = true;
         break;
     case 0xA9:
-        TRACE("  test second port\n");
+        DEBUG("  test second port\n");
         // TODO: communicate with touchpad?
         state = KBC_STATE_KEYBOARD;
         state_data = 0x00;
         break;
     case 0xAA:
-        TRACE("  test controller\n");
+        DEBUG("  test controller\n");
         // Why not pass the test?
         state = KBC_STATE_KEYBOARD;
         state_data = 0x55;
         break;
     case 0xAB:
-        TRACE("  test first port\n");
+        DEBUG("  test first port\n");
         // We _ARE_ the keyboard, so everything is good.
         state = KBC_STATE_KEYBOARD;
         state_data = 0x00;
         break;
     case 0xAD:
-        TRACE("  disable first port\n");
+        DEBUG("  disable first port\n");
         kbc_first = false;
         break;
     case 0xAE:
-        TRACE("  enable first port\n");
+        DEBUG("  enable first port\n");
         kbc_first = true;
         break;
     case 0xD1:
-        TRACE("  write port byte\n");
+        DEBUG("  write port byte\n");
         state = KBC_STATE_WRITE_PORT;
         break;
     case 0xD2:
-        TRACE("  write first port output\n");
+        DEBUG("  write first port output\n");
         state = KBC_STATE_FIRST_PORT_OUTPUT;
         break;
     case 0xD3:
-        TRACE("  write second port output\n");
+        DEBUG("  write second port output\n");
         state = KBC_STATE_SECOND_PORT_OUTPUT;
         break;
     case 0xD4:
-        TRACE("  write second port input\n");
+        DEBUG("  write second port input\n");
         state = KBC_STATE_SECOND_PORT_INPUT;
         break;
     }
@@ -516,8 +516,28 @@ void kbc_event(struct Kbc *kbc) {
             kbc_on_input_data(kbc, data);
         }
     }
-    // Write data if possible
+    // Write data if possible.
+    // Use else-if so IBF processing and OBF write never happen in the same call:
+    // kbc_clear_output() needs a loop iteration to settle before OBF reads as 0.
+    // kbc_output_pending() in the main loop triggers the follow-up call.
     else if (!(sts & KBC_STS_OBF)) {
         kbc_on_output_empty(kbc);
+    }
+}
+
+bool kbc_output_pending(void) {
+    // If OBF is already set, host hasn't read yet — don't call kbc_event()
+    // (avoids busy-waiting in kbc_keyboard() on every main loop iteration)
+    if (KBHISR & KBC_STS_OBF)
+        return false;
+    if (kbc_buffer_head != kbc_buffer_tail)
+        return true;
+    switch (state) {
+    case KBC_STATE_KEYBOARD:
+    case KBC_STATE_MOUSE:
+    case KBC_STATE_TOUCHPAD:
+        return true;
+    default:
+        return false;
     }
 }

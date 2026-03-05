@@ -22,6 +22,7 @@ extern struct Gpio __code EC_EN;
 extern struct Gpio __code EC_RSMRST_N;
 extern struct Gpio __code GC6_FB_EN;
 extern struct Gpio __code H_PROCHOT_EC;
+#define HAVE_JACK_IN_N 1
 extern struct Gpio __code JACK_IN_N;
 extern struct Gpio __code LAN_WAKEUP_N;
 extern struct Gpio __code LED_ACIN;
@@ -40,6 +41,9 @@ extern struct Gpio __code PD_IRQ;
 extern struct Gpio __code PWR_BTN_N;
 extern struct Gpio __code PWR_SW_N;
 extern struct Gpio __code RGBKB_DET_N;
+// SINK_CTRL is on GPH7 (not GPC3 like nv40mz): WU127, Group 13 bit 7, INT148
+#define HAVE_SINK_CTRL 1
+#define SINK_CTRL_IRQ   _GPIO_WUC_IRQ_H7   // 148 (IER18[4])
 extern struct Gpio __code SINK_CTRL;
 #define HAVE_SLP_SUS_N 0
 #define HAVE_SUS_PWR_ACK 0
