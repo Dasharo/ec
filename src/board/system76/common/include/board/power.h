@@ -46,5 +46,6 @@ void slp_sus_event(void);
 void sus_pwrdn_event(void);
 void lan_wakeup_event(void);
 void power_led_event(void);
+void prochot_event(void);
 
 #endif // _BOARD_POWER_H

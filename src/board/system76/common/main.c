@@ -454,6 +454,8 @@ void main(void) {
             static uint8_t batt_ticks = 0;
             timer_50ms_pending = false;
 
+            prochot_event();
+
             // Power/usbpd: debounce timeouts, usbpd_check_mode — every 100 ms
             if (++power_ticks >= 2) {
                 power_ticks = 0;

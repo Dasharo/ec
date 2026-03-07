@@ -98,6 +98,10 @@
 #define HAVE_XLP_OUT 1
 #endif
 
+#ifndef HAVE_H_PROCHOT_EC
+#define HAVE_H_PROCHOT_EC 0
+#endif
+
 extern uint8_t main_cycle;
 
 // VccRTC stable (55%) to RTCRST# high
@@ -503,6 +507,10 @@ static bool power_button_disabled(void) {
 // --------------------------------------------------------------------------
 // acin_event: handle AC adapter plug/unplug (ACIN_N, active-low)
 // --------------------------------------------------------------------------
+#if HAVE_H_PROCHOT_EC
+static uint8_t prochot_ticks;
+#endif
+
 void acin_event(void) {
     bool ac = gpio_get(&ACIN_N);
 
@@ -510,6 +518,11 @@ void acin_event(void) {
     DEBUG("Power adapter ");
     if (ac) {
         DEBUG("unplugged\n");
+#if HAVE_H_PROCHOT_EC
+        // Throttle CPU immediately; deassert after 1 second (20 × 50ms ticks)
+        gpio_set(&H_PROCHOT_EC, false);
+        prochot_ticks = 20;
+#endif
         battery_charger_disable();
         // USB power may have been kept to prevent PDC glitch
         if (power_state == POWER_STATE_G3_AOU)
@@ -528,6 +541,20 @@ void acin_event(void) {
     if (acpi_ecos != EC_OS_NONE)
         pmc_sci(&PMC_1, 0x16);
 }
+
+#if HAVE_H_PROCHOT_EC
+// Called every 50ms. Deasserts H_PROCHOT_EC# after 1 second (20 ticks).
+void prochot_event(void) {
+    if (prochot_ticks == 0)
+        return;
+    if (--prochot_ticks == 0) {
+        DEBUG("PROCHOT deasserted\n");
+        gpio_set(&H_PROCHOT_EC, true);
+    }
+}
+#else
+void prochot_event(void) {}
+#endif
 
 // --------------------------------------------------------------------------
 // pwr_sw_event: handle power button press/release (PWR_SW_N, active-low)
