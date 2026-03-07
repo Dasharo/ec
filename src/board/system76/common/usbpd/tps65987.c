@@ -24,6 +24,7 @@
 #define REG_GLOBAL_CONFIG 0x27
 #define REG_ACTIVE_CONTRACT_PDO 0x34
 
+
 #ifndef HAVE_PD_IRQ
 #define HAVE_PD_IRQ 0
 #endif
@@ -377,4 +378,79 @@ void usbpd_event(void) {
 
 void usbpd_init(void) {
     i2c_reset(&I2C_USBPD, true);
+}
+
+// Proxy a UCSI command from the OPM (BIOS/OS via SMFI) to the TPS65987 PPM.
+//
+// Uses the TPS65987 'UCSI' 4CC command interface (One-PD Controller Host Interface):
+//   - UCSI CONTROL bytes → REG_DATA1 (DataX, reg 0x09)
+//   - 'UCSI' 4CC written to REG_CMD1; poll until cleared (controller done)
+//   - Raw DataX response returned in out_data[]
+//
+// control[8]:  UCSI CONTROL bytes (command, DataLength, CommandSpecific[6])
+// out_data[16]: output buffer for TPS65987 DataX response (command-specific)
+// out_len:     actual bytes written to out_data
+//
+// Routing: ConnectorNumber from control[2] bits[6:0]: 1→PORT_A, 2→PORT_B.
+//
+// Returns 0 on success, -1 on I2C error, -2 on timeout.
+int8_t usbpd_ucsi(uint8_t *control, uint8_t *out_data, uint8_t *out_len) {
+    int16_t res;
+    uint8_t i;
+    uint16_t timeout;
+    uint8_t buf[17];
+    uint8_t addr;
+
+    // Route to correct port based on ConnectorNumber (control[2] bits 6:0)
+    addr = ((control[2] & 0x7F) > 1) ? PORT_B_ADDRESS : PORT_A_ADDRESS;
+
+    // Write UCSI CONTROL to DataX (REG_DATA1)
+    // TPS65987 register format: buf[0] = data length, buf[1..8] = UCSI CONTROL
+    buf[0] = 8;
+    for (i = 0; i < 8; i++)
+        buf[i + 1] = control[i];
+    res = i2c_set(&I2C_USBPD, addr, REG_DATA1, buf, 9);
+    if (res < 0)
+        return -1;
+
+    // Issue 'UCSI' 4CC command
+    {
+        uint8_t cmd[5] = { 4, 'U', 'C', 'S', 'I' };
+        res = i2c_set(&I2C_USBPD, addr, REG_CMD1, cmd, sizeof(cmd));
+        if (res < 0)
+            return -1;
+    }
+
+    // Poll REG_CMD1 until cleared (TPS65987 zeroes it when command completes)
+    for (timeout = 200; timeout > 0; timeout--) {
+        uint8_t cmd[5] = { 0, 0, 0, 0, 0 };
+        res = i2c_get(&I2C_USBPD, addr, REG_CMD1, cmd, sizeof(cmd));
+        if (res < 0) {
+            DEBUG("UCSI poll I2C err %d\n", res);
+            return -1;
+        }
+        if (!cmd[1] && !cmd[2] && !cmd[3] && !cmd[4])
+            break;
+    }
+    if (timeout == 0) {
+        DEBUG("UCSI poll timeout\n");
+        return -2;
+    }
+
+    // Read response from DataX (REG_DATA1)
+    for (i = 0; i < 17; i++)
+        buf[i] = 0;
+    res = i2c_get(&I2C_USBPD, addr, REG_DATA1, buf, sizeof(buf));
+    if (res < 0) {
+        DEBUG("UCSI read I2C err %d\n", res);
+        return -1;
+    }
+
+    DEBUG("UCSI DataX len=%d task_rc=%02X\n", buf[0], buf[1]);
+
+    *out_len = (buf[0] < 16) ? buf[0] : 16;
+    for (i = 0; i < *out_len; i++)
+        out_data[i] = buf[i + 1];
+
+    return 0;
 }

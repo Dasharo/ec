@@ -60,6 +60,8 @@ enum Command {
     CMD_OPTION_GET = 25,
     // Set a persistent option by index
     CMD_OPTION_SET = 26,
+    // Send a UCSI command to USB-PD controller and return CCI + MESSAGE_IN
+    CMD_UCSI = 27,
     //TODO
 };
 

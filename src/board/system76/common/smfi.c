@@ -25,6 +25,7 @@
 #include <board/dgpu.h>
 #include <board/fan.h>
 #include <board/wireless.h>
+#include <board/usbpd.h>
 #include <common/debug.h>
 
 #if CONFIG_SECURITY
@@ -257,6 +258,43 @@ static enum Result cmd_fan_curve_set(void) __reentrant {
     return RES_OK;
 }
 
+// UCSI-ACPI command:
+//   Input  [0..7]  : UCSI CONTROL (command, DataLength, CommandSpecific[6])
+//   Output [0]     : response length N
+//   Output [1..N]  : raw DataX response bytes (command-specific)
+//                    Byte 1 is the task return code.
+//                    coreboot maps the response to UCSI CCI + MESSAGE_IN for the OS.
+static enum Result cmd_ucsi(void) {
+    uint8_t control[8];
+    uint8_t out_data[16];
+    uint8_t out_len;
+    uint8_t i;
+    int8_t res;
+
+    for (i = 0; i < 8; i++)
+        control[i] = smfi_cmd[SMFI_CMD_DATA + i];
+
+    DEBUG("UCSI cmd=%02X%02X data=%02X%02X%02X%02X%02X%02X\n",
+        control[0], control[1],
+        control[2], control[3], control[4], control[5], control[6], control[7]);
+
+    out_len = 0;
+    res = usbpd_ucsi(control, out_data, &out_len);
+
+    DEBUG("UCSI res=%d out_len=%d\n", res, out_len);
+    if (out_len > 0)
+        DEBUG("UCSI out[0]=%02X [1]=%02X\n", out_data[0], out_data[1]);
+
+    if (res < 0)
+        return RES_ERR;
+
+    smfi_cmd[SMFI_CMD_DATA] = out_len;
+    for (i = 0; i < out_len; i++)
+        smfi_cmd[SMFI_CMD_DATA + 1 + i] = out_data[i];
+
+    return RES_OK;
+}
+
 static enum Result cmd_camera_enablement_set(void) {
     camera_switch_enabled = smfi_cmd[SMFI_CMD_DATA];
     gpio_set(&CCD_EN, smfi_cmd[SMFI_CMD_DATA]);
@@ -427,6 +465,9 @@ void smfi_event(void) {
             break;
         case CMD_OPTION_SET:
             smfi_cmd[SMFI_CMD_RES] = cmd_option_set();
+            break;
+        case CMD_UCSI:
+            smfi_cmd[SMFI_CMD_RES] = cmd_ucsi();
             break;
 #if CONFIG_SECURITY
         case CMD_SECURITY_GET:
