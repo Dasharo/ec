@@ -520,6 +520,7 @@ void acin_event(void) {
         if (options_get(OPT_POWER_ON_AC) == 1)
             power_on();
     }
+
     power_apply_limit(!ac);
     battery_debug();
 
