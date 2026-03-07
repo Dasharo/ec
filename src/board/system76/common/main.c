@@ -393,9 +393,17 @@ void main(void) {
         // No interrupt possible until SMFI Semaphore register is used
         smfi_event();
 
-        // Always poll kbc_event (diagnostic: like master branch)
-        kbc_irq_pending = false;
-        kbc_event(&KBC);
+        // INT24 (IBF set): host wrote a command/data byte — process it.
+        if (kbc_irq_pending) {
+            kbc_irq_pending = false;
+            kbc_event(&KBC);
+        }
+        // kbc_event() never processes IBF and writes OBF in the same call
+        // (kbc_clear_output() needs a loop iteration to settle). Drive the
+        // OBF side by polling kbc_output_pending() — no interrupt available.
+        if (kbc_output_pending()) {
+            kbc_event(&KBC);
+        }
 
         if (pmc_irq_pending) {
             pmc_irq_pending = false;
