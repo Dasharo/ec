@@ -29,12 +29,22 @@ void update_power_state(void);
 extern uint8_t pep_hook;
 #endif
 
+bool is_standby_power_needed(void);
+
 void power_init(void);
 void power_on(void);
 void power_off(void);
 void power_cpu_reset(void);
 void power_apply_limit(bool ac);
 
-void power_event(void);
+// Per-signal event handlers — called from main loop when IRQ flag is set.
+void acin_event(void);
+void pwr_sw_event(void);
+void sys_pwrgd_event(void);
+void plt_rst_event(void);
+void slp_sus_event(void);
+void sus_pwrdn_event(void);
+void lan_wakeup_event(void);
+void power_led_event(void);
 
 #endif // _BOARD_POWER_H

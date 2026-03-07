@@ -67,12 +67,18 @@
 // kbscan_irq_pending and kbscan_matrix[] are defined in kbscan.c.
 // dgpu_irq_pending is defined in dgpu.c.
 // --------------------------------------------------------------------------
-volatile bool power_irq_pending = false;
-volatile bool lid_irq_pending   = false;
-volatile bool smfi_irq_pending  = false;
-volatile bool kbc_irq_pending   = false;
-volatile bool pmc_irq_pending   = false;
-volatile bool espi_irq_pending  = false;
+volatile bool acin_irq_pending       = false;
+volatile bool pwr_sw_irq_pending     = false;
+volatile bool sys_pwrgd_irq_pending  = false;
+volatile bool plt_rst_irq_pending    = false;
+volatile bool slp_sus_irq_pending    = false;
+volatile bool lan_wakeup_irq_pending = false;
+volatile bool usbpd_irq_pending      = false;
+volatile bool lid_irq_pending        = false;
+volatile bool smfi_irq_pending       = false;
+volatile bool kbc_irq_pending        = false;
+volatile bool pmc_irq_pending        = false;
+volatile bool espi_irq_pending       = false;
 
 void external_0(void) __interrupt(0) {}
 // timer_0 is in time.c
@@ -93,16 +99,16 @@ void external_1(void) __interrupt(2) {
 #if HAVE_JACK_IN_N
     case _GPIO_WUC_IRQ_C6:  // JACK_IN_N (GPC6 → INT6)
         gpio_irq_ack(&JACK_IN_N);
-        power_irq_pending = true;
+        usbpd_irq_pending = true;
         break;
 #endif
     case _GPIO_WUC_IRQ_B3:  // PWR_SW_N (GPB3 → INT14)
         gpio_irq_ack(&PWR_SW_N);
-        power_irq_pending = true;
+        pwr_sw_irq_pending = true;
         break;
     case _GPIO_WUC_IRQ_D2:  // BUF_PLT_RST_N (GPD2 → INT17)
         gpio_irq_ack(&BUF_PLT_RST_N);
-        power_irq_pending = true;
+        plt_rst_irq_pending = true;
         break;
     case 22:  // SMFI semaphore (INT22 = IER2[6])
         ISR2 = BIT(6); // write-1-to-clear: unblock IVCT for other pending IRQs
@@ -119,7 +125,7 @@ void external_1(void) __interrupt(2) {
 #if HAVE_PD_IRQ
     case _GPIO_WUC_IRQ_E2:  // PD_IRQ (GPE2 → INT74)
         gpio_irq_ack(&PD_IRQ);
-        power_irq_pending = true;
+        usbpd_irq_pending = true;
         break;
 #endif
     case 84:  // KSM scan data valid (INT84 = IER10[4])
@@ -141,16 +147,16 @@ void external_1(void) __interrupt(2) {
 #if HAVE_LAN_WAKEUP_N
     case _GPIO_WUC_IRQ_B2:  // LAN_WAKEUP_N (GPB2 → INT92)
         gpio_irq_ack(&LAN_WAKEUP_N);
-        power_irq_pending = true;
+        lan_wakeup_irq_pending = true;
         break;
 #endif
     case _GPIO_WUC_IRQ_C0:  // ALL_SYS_PWRGD (GPC0 → INT93)
         gpio_irq_ack(&ALL_SYS_PWRGD);
-        power_irq_pending = true;
+        sys_pwrgd_irq_pending = true;
         break;
     case _GPIO_WUC_IRQ_B0:  // ACIN_N (GPB0 → INT106, WU101 Group 10 bit 5)
         gpio_irq_ack(&ACIN_N);
-        power_irq_pending = true;
+        acin_irq_pending = true;
         break;
     case _GPIO_WUC_IRQ_B1:  // LID_SW_N (GPB1 → INT107, WU102 Group 10 bit 6)
         gpio_irq_ack(&LID_SW_N);
@@ -159,7 +165,7 @@ void external_1(void) __interrupt(2) {
 #if HAVE_SINK_CTRL
     case SINK_CTRL_IRQ:  // SINK_CTRL (board-specific pin → IRQ from gpio_wuc.h)
         gpio_irq_ack(&SINK_CTRL);
-        power_irq_pending = true;
+        usbpd_irq_pending = true;
         break;
 #endif
 #if HAVE_DGPU
@@ -171,7 +177,7 @@ void external_1(void) __interrupt(2) {
 #if HAVE_SLP_SUS_N
     case _GPIO_WUC_IRQ_J7:  // SLP_SUS_N (GPJ7 → INT135)
         gpio_irq_ack(&SLP_SUS_N);
-        power_irq_pending = true;
+        slp_sus_irq_pending = true;
         break;
 #endif
 #if CONFIG_BUS_ESPI
@@ -234,15 +240,8 @@ static void intc_init(void) {
     gpio_irq_enable(&ALL_SYS_PWRGD);
     gpio_irq_enable(&ACIN_N);
 
-    // LID_SW_N: enable interrupt then set initial edge from current lid state
-    // so the first transition (open→close or close→open) is not missed.
+    // LID_SW_N: gpio_irq_enable arms for the correct edge based on current state.
     gpio_irq_enable(&LID_SW_N);
-    if (gpio_get(&LID_SW_N)) {
-        // Lid open (GPIO=1): override to falling edge to detect lid close.
-        volatile uint8_t __xdata *wuemr = gpio_wuemr(LID_SW_N.wuc_group);
-        if (wuemr) *wuemr &= ~BIT(LID_SW_N.wuc_bit);
-        // lid closed: rising edge (detect open) already set by gpio_irq_enable
-    }
 
 #if HAVE_SINK_CTRL
     gpio_irq_enable(&SINK_CTRL);
@@ -304,9 +303,9 @@ void init(void) {
     power_init();
     board_init();
 
-    // Read actual lid state at boot (lid_state defaults to false/closed;
-    // the WUC edge interrupt only fires on change, not initial state)
-    lid_event();
+    // Sequence the board to the initial state
+    power_off();
+    update_power_state();
 }
 
 void main(void) {
@@ -329,13 +328,53 @@ void main(void) {
             last_irq = 0;
         }
 
-        // Power/USB-PD GPIO edges: run usbpd_event then power_event
-        // (USB-PD must precede power, matching original call order)
-        if (power_irq_pending) {
-            power_irq_pending = false;
+        // USB-PD signals: JACK_IN_N, SINK_CTRL, PD_IRQ
+        if (usbpd_irq_pending) {
+            usbpd_irq_pending = false;
             usbpd_event();
-            power_event();
         }
+
+        // AC adapter plug/unplug: also refreshes USB-PD current limits
+        if (acin_irq_pending) {
+            acin_irq_pending = false;
+            usbpd_event();
+            acin_event();
+        }
+
+        // Power button press/release
+        if (pwr_sw_irq_pending) {
+            pwr_sw_irq_pending = false;
+            pwr_sw_event();
+        }
+
+        // Platform reset de-assertion (BUF_PLT_RST_N)
+        if (plt_rst_irq_pending) {
+            plt_rst_irq_pending = false;
+            plt_rst_event();
+        }
+
+        // System power good (ALL_SYS_PWRGD)
+        if (sys_pwrgd_irq_pending) {
+            sys_pwrgd_irq_pending = false;
+            update_power_state();
+            sys_pwrgd_event();
+        }
+
+        // Suspend (SLP_SUS_N) — debug logging only
+#if HAVE_SLP_SUS_N
+        if (slp_sus_irq_pending) {
+            slp_sus_irq_pending = false;
+            slp_sus_event();
+        }
+#endif
+
+        // LAN remote wakeup
+#if HAVE_LAN_WAKEUP_N
+        if (lan_wakeup_irq_pending) {
+            lan_wakeup_irq_pending = false;
+            lan_wakeup_event();
+        }
+#endif
 
         if (lid_irq_pending) {
             lid_irq_pending = false;
@@ -396,7 +435,8 @@ void main(void) {
             if (++power_ticks >= 2) {
                 power_ticks = 0;
                 usbpd_event();
-                power_event();
+                sus_pwrdn_event();
+                power_led_event();
             }
 
             // Fan: smooth=250 ms (5 ticks), normal=1000 ms (20 ticks)

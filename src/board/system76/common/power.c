@@ -218,7 +218,7 @@ void update_power_state(void) {
     }
 }
 
-static bool is_standby_power_needed(void) {
+bool is_standby_power_needed(void) {
     if (options_get(OPT_ALWAYS_ON_USB))
         return true;
 
@@ -503,7 +503,7 @@ static bool power_button_disabled(void) {
 // --------------------------------------------------------------------------
 // acin_event: handle AC adapter plug/unplug (ACIN_N, active-low)
 // --------------------------------------------------------------------------
-static void acin_event(void) {
+void acin_event(void) {
     static bool ac_send_sci = true;
     static bool ac_last = true;
     static uint32_t ac_unplug_time = 0;
@@ -559,7 +559,7 @@ static void acin_event(void) {
 // --------------------------------------------------------------------------
 // pwr_sw_event: handle power button press/release (PWR_SW_N, active-low)
 // --------------------------------------------------------------------------
-static void pwr_sw_event(void) {
+void pwr_sw_event(void) {
     static bool ps_last = true;
     bool ps_new = gpio_get(&PWR_SW_N);
 
@@ -606,7 +606,7 @@ static void pwr_sw_event(void) {
 // --------------------------------------------------------------------------
 // sys_pwrgd_event: handle ALL_SYS_PWRGD (system power good)
 // --------------------------------------------------------------------------
-static void sys_pwrgd_event(void) {
+void sys_pwrgd_event(void) {
     static bool pg_last = false;
     bool pg_new = gpio_get(&ALL_SYS_PWRGD);
 
@@ -646,7 +646,7 @@ static void sys_pwrgd_event(void) {
 // --------------------------------------------------------------------------
 // plt_rst_event: handle BUF_PLT_RST_N (platform reset, active-low)
 // --------------------------------------------------------------------------
-static void plt_rst_event(void) {
+void plt_rst_event(void) {
     // clang-format off
     static bool rst_last = false;
     bool rst_new = gpio_get(&BUF_PLT_RST_N);
@@ -671,7 +671,7 @@ static void plt_rst_event(void) {
 // slp_sus_event: handle SLP_SUS_N (suspend, active-low) — debug logging only
 // --------------------------------------------------------------------------
 #if HAVE_SLP_SUS_N
-static void slp_sus_event(void) {
+void slp_sus_event(void) {
 #if LEVEL >= LEVEL_DEBUG
     static bool sus_last = true;
     bool sus_new = gpio_get(&SLP_SUS_N);
@@ -688,7 +688,7 @@ static void slp_sus_event(void) {
 // --------------------------------------------------------------------------
 // sus_pwrdn_event: handle SUSWARN_N / VW_SUS_PWRDN_ACK (S5 power-down ack)
 // --------------------------------------------------------------------------
-static void sus_pwrdn_event(void) {
+void sus_pwrdn_event(void) {
 #if CONFIG_BUS_ESPI
     // ESPI systems must keep S5 planes powered unless VW_SUS_PWRDN_ACK is high
     if (vw_get(&VW_SUS_PWRDN_ACK) == VWS_HIGH)
@@ -727,7 +727,7 @@ static void sus_pwrdn_event(void) {
 // lan_wakeup_event: handle LAN_WAKEUP_N (remote wake from G3, active-low)
 // --------------------------------------------------------------------------
 #if HAVE_LAN_WAKEUP_N
-static void lan_wakeup_event(void) {
+void lan_wakeup_event(void) {
     static bool wake_last = true;
     bool wake_new = gpio_get(&LAN_WAKEUP_N);
 
@@ -750,7 +750,7 @@ static void lan_wakeup_event(void) {
 // --------------------------------------------------------------------------
 // power_led_event: update power and battery LEDs based on current state
 // --------------------------------------------------------------------------
-static void power_led_event(void) {
+void power_led_event(void) {
     static uint32_t last_time = 0;
     uint32_t time = time_get();
     bool ac_new = gpio_get(&ACIN_N);
@@ -829,24 +829,3 @@ static void power_led_event(void) {
 #endif // HAVE_LED_BAT_CHG && HAVE_LED_BAT_FULL
 }
 
-void power_event(void) {
-    if (power_state == POWER_STATE_G3 && is_standby_power_needed())
-        power_sequence(POWER_STATE_G3_AOU);
-
-    acin_event();
-    pwr_sw_event();
-
-    // Update power state before handling power-good and reset signals
-    update_power_state();
-
-    sys_pwrgd_event();
-    plt_rst_event();
-#if HAVE_SLP_SUS_N
-    slp_sus_event();
-#endif
-    sus_pwrdn_event();
-#if HAVE_LAN_WAKEUP_N
-    lan_wakeup_event();
-#endif
-    power_led_event();
-}
