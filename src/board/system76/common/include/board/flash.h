@@ -26,7 +26,7 @@
  * \param[out] data   The memory area to copy to.
  * \param[in]  length The number of bytes to copy.
  */
-void flash_read(uint32_t addr, __xdata uint8_t *data, uint32_t length);
+void flash_read(uint32_t addr, __xdata uint8_t *data, uint32_t length) __reentrant;
 
 /**
  * Read a single byte from flash.
@@ -35,7 +35,7 @@ void flash_read(uint32_t addr, __xdata uint8_t *data, uint32_t length);
  *
  * \return The value read from flash.
  */
-uint8_t flash_read_u8(uint32_t addr);
+uint8_t flash_read_u8(uint32_t addr) __reentrant;
 
 /**
  * Read two bytes from flash.
@@ -44,7 +44,7 @@ uint8_t flash_read_u8(uint32_t addr);
  *
  * \return The value read from flash.
  */
-uint16_t flash_read_u16(uint32_t addr);
+uint16_t flash_read_u16(uint32_t addr) __reentrant;
 
 /**
  * Read four bytes from flash.
@@ -53,7 +53,7 @@ uint16_t flash_read_u16(uint32_t addr);
  *
  * \return The value read from flash.
  */
-uint32_t flash_read_u32(uint32_t addr);
+uint32_t flash_read_u32(uint32_t addr) __reentrant;
 
 /**
  * Write data to flash from the specified buffer.
@@ -62,7 +62,7 @@ uint32_t flash_read_u32(uint32_t addr);
  * \param[in] data   The memory area to copy from.
  * \param[in] length The number of bytes to copy.
  */
-void flash_write(uint32_t addr, __xdata uint8_t *data, uint32_t length);
+void flash_write(uint32_t addr, __xdata uint8_t *data, uint32_t length) __reentrant;
 
 /**
  * Write a single byte to flash.
@@ -70,7 +70,7 @@ void flash_write(uint32_t addr, __xdata uint8_t *data, uint32_t length);
  * \param[in] addr   The flash address to read.
  * \param[in] data   The value to write to flash.
  */
-void flash_write_u8(uint32_t addr, uint8_t data);
+void flash_write_u8(uint32_t addr, uint8_t data) __reentrant;
 
 /**
  * Write two bytes to flash.
@@ -78,7 +78,7 @@ void flash_write_u8(uint32_t addr, uint8_t data);
  * \param[in] addr   The flash address to read.
  * \param[in] data   The value to write to flash.
  */
-void flash_write_u16(uint32_t addr, uint16_t data);
+void flash_write_u16(uint32_t addr, uint16_t data) __reentrant;
 
 /**
  * Write two bytes to flash.
@@ -86,13 +86,13 @@ void flash_write_u16(uint32_t addr, uint16_t data);
  * \param[in] addr   The flash address to read.
  * \param[in] data   The value to write to flash.
  */
-void flash_write_u32(uint32_t addr, uint32_t data);
+void flash_write_u32(uint32_t addr, uint32_t data) __reentrant;
 
 /**
  * Erase a 1K block of flash.
  *
  * \param[in] addr  The flash address contained in the 1K block.
  */
-void flash_erase(uint32_t addr);
+void flash_erase(uint32_t addr) __reentrant;
 
 #endif // _BOARD_FLASH_H

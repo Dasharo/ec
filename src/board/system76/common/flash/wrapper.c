@@ -15,7 +15,7 @@ uint8_t __code __at(FLASH_OFFSET) flash_rom[] = {
 #include <flash.h>
 };
 
-static void flash_api(uint32_t addr, uint8_t *data, uint32_t length, uint8_t command) {
+static void flash_api(uint32_t addr, uint8_t *data, uint32_t length, uint8_t command) __reentrant {
     // Use DMA mapping to copy flash ROM to scratch ROM
     SCARH = 0x80;
     SCARL = (uint8_t)(FLASH_OFFSET);
@@ -29,11 +29,11 @@ static void flash_api(uint32_t addr, uint8_t *data, uint32_t length, uint8_t com
     SCARH = 0x07;
 }
 
-void flash_read(uint32_t addr, __xdata uint8_t *data, uint32_t length) {
+void flash_read(uint32_t addr, __xdata uint8_t *data, uint32_t length) __reentrant {
     flash_api(addr, data, length, FLASH_COMMAND_READ);
 }
 
-uint32_t flash_read_u32(uint32_t addr) {
+uint32_t flash_read_u32(uint32_t addr) __reentrant {
     uint32_t data;
 
     flash_api(addr, (uint8_t *)&data, sizeof(data), FLASH_COMMAND_READ);
@@ -41,7 +41,7 @@ uint32_t flash_read_u32(uint32_t addr) {
     return data;
 }
 
-uint16_t flash_read_u16(uint32_t addr) {
+uint16_t flash_read_u16(uint32_t addr) __reentrant {
     uint16_t data;
 
     flash_api(addr, (uint8_t *)&data, sizeof(data), FLASH_COMMAND_READ);
@@ -49,7 +49,7 @@ uint16_t flash_read_u16(uint32_t addr) {
     return data;
 }
 
-uint8_t flash_read_u8(uint32_t addr) {
+uint8_t flash_read_u8(uint32_t addr) __reentrant {
     uint8_t data;
 
     flash_api(addr, &data, sizeof(data), FLASH_COMMAND_READ);
@@ -57,22 +57,22 @@ uint8_t flash_read_u8(uint32_t addr) {
     return data;
 }
 
-void flash_write(uint32_t addr, __xdata uint8_t *data, uint32_t length) {
+void flash_write(uint32_t addr, __xdata uint8_t *data, uint32_t length) __reentrant {
     flash_api(addr, data, length, FLASH_COMMAND_WRITE);
 }
 
-void flash_write_u32(uint32_t addr, uint32_t data) {
+void flash_write_u32(uint32_t addr, uint32_t data) __reentrant {
     flash_api(addr, (uint8_t *)&data, sizeof(data), FLASH_COMMAND_WRITE);
 }
 
-void flash_write_u16(uint32_t addr, uint16_t data) {
+void flash_write_u16(uint32_t addr, uint16_t data) __reentrant {
     flash_api(addr, (uint8_t *)&data, sizeof(data), FLASH_COMMAND_WRITE);
 }
 
-void flash_write_u8(uint32_t addr, uint8_t data) {
+void flash_write_u8(uint32_t addr, uint8_t data) __reentrant {
     flash_api(addr, &data, sizeof(data), FLASH_COMMAND_WRITE);
 }
 
-void flash_erase(uint32_t addr) {
+void flash_erase(uint32_t addr) __reentrant {
     flash_api(addr, NULL, 0, FLASH_COMMAND_ERASE_1K);
 }

@@ -182,7 +182,7 @@ static enum Result cmd_keymap_get(void) {
     }
 }
 
-static enum Result cmd_keymap_set(void) {
+static enum Result cmd_keymap_set(void) __reentrant {
     int16_t layer = smfi_cmd[SMFI_CMD_DATA];
     int16_t output = smfi_cmd[SMFI_CMD_DATA + 1];
     int16_t input = smfi_cmd[SMFI_CMD_DATA + 2];
@@ -230,10 +230,11 @@ static enum Result cmd_security_set(void) {
 #endif // CONFIG_SECURITY
 
 // Command structure: [fan] [temp0] [duty0] ... [temp3] [duty3]
-static enum Result cmd_fan_curve_set(void) {
+static enum Result cmd_fan_curve_set(void) __reentrant {
+    int i;
     struct FanPoint points[4];
 
-    for (int i = 0; i < 4; ++i) {
+    for (i = 0; i < 4; ++i) {
         points[i].temp = smfi_cmd[2 * i + SMFI_CMD_DATA + 1];
         points[i].duty = smfi_cmd[2 * i + SMFI_CMD_DATA + 2] * 255 / 100;
     }
@@ -265,7 +266,6 @@ static enum Result cmd_camera_enablement_set(void) {
 
 static enum Result cmd_wifi_bt_enablement_set(void) {
     wireless_power(smfi_cmd[SMFI_CMD_DATA]);
-    TRACE("WIRELESS %sABLED\n", smfi_cmd[SMFI_CMD_DATA] ? "EN" : "DIS");
     return RES_OK;
 }
 

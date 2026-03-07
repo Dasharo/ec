@@ -87,5 +87,6 @@ void battery_event(void) {
 
     TRACE("BAT %d mV %d mA\n", battery_info.voltage, battery_info.current);
 
+    battery_charger_configure();
     battery_charger_event();
 }

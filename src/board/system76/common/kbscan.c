@@ -27,7 +27,17 @@ bool kbscan_enabled = false;
 uint16_t kbscan_repeat_period = 91;
 uint16_t kbscan_repeat_delay = 500;
 
-uint8_t kbscan_matrix[KM_OUT] = { 0 };
+// Raw scan matrix filled by INT84 ISR from hardware KSM result registers.
+// 1 = key pressed (active high, ISR inverts the active-low hardware data).
+volatile uint8_t kbscan_matrix[KM_OUT] = { 0 };
+
+// Set by ISR when a new scan result is available
+volatile bool kbscan_irq_pending = false;
+
+// Set by kbscan_event when a key is held and repeat is pending.
+// Allows main loop to keep calling kbscan_event() via timer_0 wakeup
+// even when INT84 doesn't fire (hardware KSM only fires on scan change).
+volatile bool kbscan_repeat_active = false;
 
 uint8_t sci_extra = 0;
 
@@ -42,83 +52,46 @@ static inline bool matrix_position_is_fn(uint8_t row, uint8_t col) {
 }
 
 void kbscan_init(void) {
-    KSOCTRL = 0x05;
-    KSICTRLR = 0x04;
+    // Configure KSO: pull-up enabled (bit2), open-drain (bit0)
+    KSOCTRL = BIT(2) | BIT(0);
+    // Configure KSI: pull-up enabled (bit2)
+    KSICTRLR = BIT(2);
 
-    // Set all outputs to GPIO mode, low, and inputs
-    KSOL = 0;
-    KSOLGCTRL = 0xFF;
-    KSOLGOEN = 0;
-    KSOH1 = 0;
-    KSOHGCTRL = 0xFF;
-    KSOHGOEN = 0;
-    KSOH2 = 0;
+    // Put KSO lines in KBM (hardware scan) mode, not GPIO mode
+    KSOLGCTRL = 0;   // KSO0-7: hardware scan controller
+    KSOHGCTRL = 0;   // KSO8-15: hardware scan controller
+    // KSO16/17 (KSOH2) have no GCTRL; driven by hardware when SDEN=1
 
-    // Set all inputs to KBS mode, low, and inputs
+    // Set all KSI lines to KBS mode (inputs driven by keyboard)
     KSIGCTRL = 0;
     KSIGOEN = 0;
     KSIGDAT = 0;
+
+    // Scan Data Control 2:
+    //   WKSOHDLY=0 (23us KSO high delay)
+    //   KSOPCS: number of KSO columns
+#if KM_OUT <= 16
+    SDC2R = 0x00;   // KSOPCS=00: 16 KSO columns
+#elif KM_OUT == 17
+    SDC2R = 0x40;   // KSOPCS=01: 17 KSO columns
+#else
+    SDC2R = 0x80;   // KSOPCS=10: 18 KSO columns
+#endif
+
+    // Scan Data Control 3:
+    //   WKSOLDLY=0 (11us KSO low delay), SDLYBR=1 (1ms between scan rounds)
+    SDC3R = 0x01;
+
+    // Scan Data Control 1:
+    //   SDEN=1 (enable hardware scan), INTSDVEN=1 (INT84 on scan valid), SLS=001 (2 rounds)
+    SDC1R = BIT(7) | BIT(5) | 0x01;
+
+    // Enable INT84 (scan data valid interrupt) in intc_init()
+    // (called after kbscan_init from init(), intc_init runs last)
 }
 
 // Debounce time in milliseconds
 #define DEBOUNCE_DELAY 15
-
-static uint8_t kbscan_get_row(uint8_t i) {
-    // Report all keys as released when lid is closed
-    if (!lid_state) {
-        return 0;
-    }
-
-    // Set current line as output
-    if (i < 8) {
-        KSOLGOEN = BIT(i);
-        KSOHGOEN = 0;
-#if KM_OUT >= 17
-        GPCRC3 = GPIO_IN;
-#endif
-#if KM_OUT >= 18
-        GPCRC5 = GPIO_IN;
-#endif
-    } else if (i < 16) {
-        KSOLGOEN = 0;
-        KSOHGOEN = BIT((i - 8));
-#if KM_OUT >= 17
-        GPCRC3 = GPIO_IN;
-#endif
-#if KM_OUT >= 18
-        GPCRC5 = GPIO_IN;
-#endif
-    } else if (i == 16) {
-        KSOLGOEN = 0;
-        KSOHGOEN = 0;
-#if KM_OUT >= 17
-        GPCRC3 = GPIO_OUT;
-#endif
-#if KM_OUT >= 18
-        GPCRC5 = GPIO_IN;
-#endif
-    } else if (i == 17) {
-        KSOLGOEN = 0;
-        KSOHGOEN = 0;
-#if KM_OUT >= 17
-        GPCRC3 = GPIO_IN;
-#endif
-#if KM_OUT >= 18
-        GPCRC5 = GPIO_OUT;
-#endif
-    }
-#if KM_OUT >= 17
-    GPDRC &= ~BIT(3);
-#endif
-#if KM_OUT >= 18
-    GPDRC &= ~BIT(5);
-#endif
-
-    // TODO: figure out optimal delay
-    delay_ticks(20);
-
-    return ~KSI;
-}
 
 #if KM_NKEY
 static bool kbscan_has_ghost_in_row(uint8_t row, uint8_t rowdata) {
@@ -149,14 +122,15 @@ static uint8_t kbscan_get_real_keys(uint8_t row, uint8_t rowdata) {
 static bool kbscan_has_ghost_in_row(uint8_t row, uint8_t rowdata) {
     rowdata = kbscan_get_real_keys(row, rowdata);
 
-    // No ghosts exist when  less than 2 keys in the row are active.
+    // No ghosts exist when less than 2 keys in the row are active.
     if (!popcount_more_than_one(rowdata)) {
         return false;
     }
 
     // Check against other rows to see if more than one column matches.
     for (uint8_t i = 0; i < KM_OUT; i++) {
-        uint8_t otherrow = kbscan_get_real_keys(i, kbscan_get_row(i));
+        // Read raw scan data for row i from hardware KSM result
+        uint8_t otherrow = kbscan_get_real_keys(i, kbscan_matrix[i]);
         if (i != row && popcount_more_than_one(otherrow & rowdata)) {
             return true;
         }
@@ -336,25 +310,33 @@ void kbscan_event(void) {
     static uint8_t kbscan_last_layer[KM_OUT][KM_IN] = { { 0 } };
     static bool kbscan_ghost[KM_OUT] = { false };
 
-    static bool debounce = false;
-    static uint32_t debounce_time = 0;
+    // Debounced state: updated here, compared against kbscan_matrix (raw)
+    static uint8_t kbscan_debounced[KM_OUT] = { 0 };
+
+    // Per-row debounce: rows are independent so fast multi-key typing is not blocked
+    static bool debounce[KM_OUT] = { false };
+    static uint32_t debounce_time[KM_OUT] = { 0 };
 
     static bool repeat = false;
     static uint16_t repeat_key = 0;
     static uint32_t repeat_key_time = 0;
+    static uint32_t repeat_start = 0;
 
-    // If debounce complete
-    if (debounce) {
-        uint32_t time = time_get();
-        if ((time - debounce_time) >= DEBOUNCE_DELAY) {
-            // Finish debounce
-            debounce = false;
+    // Report all keys as released when lid is closed
+    if (!lid_state) {
+        for (uint8_t i = 0; i < KM_OUT; i++) {
+            kbscan_debounced[i] = 0;
         }
+        return;
     }
 
     for (uint8_t i = 0; i < KM_OUT; i++) {
-        uint8_t new = kbscan_get_row(i);
-        uint8_t last = kbscan_matrix[i];
+        // Expire per-row debounce (inline time_get to keep DSEG usage minimal)
+        if (debounce[i] && (time_get() - debounce_time[i]) >= DEBOUNCE_DELAY)
+            debounce[i] = false;
+
+        uint8_t new = kbscan_matrix[i];  // raw scan from ISR (1=pressed)
+        uint8_t last = kbscan_debounced[i];
         if (new != last) {
             if (kbscan_has_ghost_in_row(i, new)) {
                 kbscan_ghost[i] = true;
@@ -362,8 +344,8 @@ void kbscan_event(void) {
             } else if (kbscan_ghost[i]) {
                 kbscan_ghost[i] = false;
                 // Debounce to allow remaining ghosts to settle.
-                debounce = true;
-                debounce_time = time_get();
+                debounce[i] = true;
+                debounce_time[i] = time_get();
             }
 
             // A key was pressed or released
@@ -375,14 +357,14 @@ void kbscan_event(void) {
                 if (new_b != last_b) {
                     bool reset = false;
 
-                    // If debouncing
-                    if (debounce) {
+                    // If debouncing this row
+                    if (debounce[i]) {
                         // Debounce presses and releases
                         reset = true;
                     } else {
-                        // Begin debounce
-                        debounce = true;
-                        debounce_time = time_get();
+                        // Begin debounce for this row
+                        debounce[i] = true;
+                        debounce_time[i] = time_get();
 
                         // Check keys used for config reset
                         if (matrix_position_is_esc(i, j))
@@ -431,18 +413,17 @@ void kbscan_event(void) {
                 }
             }
 
-            kbscan_matrix[i] = new;
+            kbscan_debounced[i] = new;
         } else if (new && repeat_key != 0 && key_should_repeat(repeat_key)) {
-            // A key is being pressed
+            // A key is being held — check typematic repeat
             uint32_t time = time_get();
-            static uint32_t repeat_start = 0;
 
             if (!repeat) {
                 if (time < repeat_key_time) {
                     // Overflow, reset repeat_key_time
                     repeat_key_time = time;
                 } else if ((time - repeat_key_time) >= kbscan_repeat_delay) {
-                    // Typematic repeat
+                    // Typematic repeat delay elapsed
                     repeat = true;
                     repeat_start = time;
                 }
@@ -459,16 +440,6 @@ void kbscan_event(void) {
 
     kbscan_layer = layer;
 
-    // Reset all lines to inputs
-    KSOLGOEN = 0;
-    KSOHGOEN = 0;
-#if KM_OUT >= 17
-    GPCRC3 = GPIO_IN;
-#endif
-#if KM_OUT >= 18
-    GPCRC5 = GPIO_IN;
-#endif
-
-    // TODO: figure out optimal delay
-    delay_ticks(10);
+    // Drive repeat from main loop when INT84 doesn't fire (key stable/held)
+    kbscan_repeat_active = (repeat_key != 0);
 }

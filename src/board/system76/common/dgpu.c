@@ -2,6 +2,7 @@
 
 #include <board/dgpu.h>
 #include <board/fan.h>
+#include <board/irq.h>
 
 #if HAVE_DGPU
 
@@ -94,13 +95,14 @@ uint8_t dgpu_get_d_notify_level(bool ac) {
     return 0;
 }
 
-int16_t dgpu_set_fan_curve(uint8_t count, struct FanPoint *points) {
+int16_t dgpu_set_fan_curve(uint8_t count, struct FanPoint *points) __reentrant {
+    int i;
     if (count != FAN.points_size) {
         TRACE("DGPU: Incorrect number of fan points: %d, expected %d\n", count, FAN.points_size);
         return -1;
     }
 
-    for (int i = 0; i < count; ++i) {
+    for (i = 0; i < count; ++i) {
         TRACE("DGPU: fan curve t%d: %d, d%d: %d\n", i, points[i].temp, i, points[i].duty);
         FAN.points[i].temp = points[i].temp;
         FAN.points[i].duty = points[i].duty;
@@ -164,3 +166,7 @@ uint8_t dgpu_get_fan_duty(void) {
 }
 
 #endif // HAVE_DGPU
+
+// Defined outside #if HAVE_DGPU so irq.h consumers can always reference it.
+// When HAVE_DGPU=0, main.c's #if HAVE_DGPU guard prevents the ISR case from firing.
+volatile bool dgpu_irq_pending = false;

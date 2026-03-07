@@ -4,6 +4,7 @@
 #define _EC_GPIO_H
 
 #include <common/macro.h>
+#include <ec/gpio_wuc.h>
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -21,19 +22,44 @@ struct Gpio {
     volatile uint8_t __xdata *mirror;
     volatile uint8_t __xdata *control;
     uint8_t value;
+    // WUC (Wake-Up Control) and INTC fields — populated from gpio_wuc.h table.
+    // wuc_group = 0 means this pin has no WUC/INTC capability.
+    uint8_t wuc_group;  // WUC group number (1-14; 0 = none)
+    uint8_t wuc_bit;    // bit within WUEMR/WUESR (0-7)
+    uint8_t irq;        // INTC IRQ number (IER_reg * 8 + IER_bit)
 };
 
 // clang-format off
 #define GPIO(BLOCK, NUMBER) { \
-    .data = &GPDR ## BLOCK, \
-    .mirror = &GPDMR ## BLOCK, \
-    .control = &GPCR ## BLOCK ## NUMBER, \
-    .value = BIT(NUMBER), \
+    .data      = &GPDR ## BLOCK, \
+    .mirror    = &GPDMR ## BLOCK, \
+    .control   = &GPCR ## BLOCK ## NUMBER, \
+    .value     = BIT(NUMBER), \
+    .wuc_group = _GPIO_WUC_GROUP_ ## BLOCK ## NUMBER, \
+    .wuc_bit   = _GPIO_WUC_BIT_   ## BLOCK ## NUMBER, \
+    .irq       = _GPIO_WUC_IRQ_   ## BLOCK ## NUMBER, \
 }
 // clang-format on
 
 bool gpio_get(struct Gpio *gpio);
 void gpio_set(struct Gpio *gpio, bool value);
+
+// Chrome EC-style register accessors: compute WUEMR/WUESR from group number,
+// IER/ISR from IRQ number. Return NULL for invalid/unsupported inputs.
+volatile uint8_t __xdata *gpio_wuemr(uint8_t group);
+volatile uint8_t __xdata *gpio_wuesr(uint8_t group);
+volatile uint8_t __xdata *gpio_ier(uint8_t irq);
+volatile uint8_t __xdata *gpio_isr(uint8_t irq);
+
+// Enable edge-detect interrupt for a GPIO.
+// Sets rising edge initially, clears WUESR, and enables the IER bit.
+// gpio->wuc_group must be non-zero; no-op otherwise.
+void gpio_irq_enable(const struct Gpio *gpio);
+
+// Acknowledge a WUC-sourced interrupt from within the ISR.
+// Toggles WUEMR edge direction (any-edge detection), double-clears WUESR
+// to prevent spurious re-trigger, and clears the INTC ISR latch.
+void gpio_irq_ack(const struct Gpio *gpio);
 
 #ifdef GPIO_DEBUG
 void gpio_debug(void);

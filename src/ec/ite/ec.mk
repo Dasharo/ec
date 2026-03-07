@@ -17,9 +17,10 @@ SRAM_SIZE=2048
 else ifeq ($(CONFIG_EC_ITE_IT5570E), y)
 CFLAGS+=-DCONFIG_EC_ITE_IT5570E=1
 # SRAM is 6144 bytes, only 4096 bytes are mapped at address 0. Region at
-# 0x0E00-0x1000 is used for AP communication. So this is brought down to 2048,
-# which matches IT8587E limits
-SRAM_SIZE=2048
+# 0x0E00-0x0FFF is used for AP communication, so the safe XSEG limit is
+# 0x0E00 = 3584 bytes (was 2048 to match IT8587E, but IT5570E-only builds
+# can use the full safe range).
+SRAM_SIZE=3584
 else
 $(error Unsupported EC)
 endif
