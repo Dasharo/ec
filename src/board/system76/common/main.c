@@ -303,8 +303,17 @@ void init(void) {
     power_init();
     board_init();
 
+    // Set the initial lid and AC states
+    lid_event();
+    acin_event();
+
     // Sequence the board to the initial state
-    power_off();
+    usbpd_event();
+    // If we were woken by power button, power on.
+    if (!gpio_get(&PWR_SW_N))
+        power_on();
+    else
+        power_off();
     update_power_state();
 }
 

@@ -133,7 +133,12 @@ void gpio_irq_enable(const struct Gpio *gpio) {
     if (!wuemr || !wuesr || !ier) return;
 
     mask = BIT(gpio->wuc_bit);
-    *wuemr |= mask;          // rising edge initially
+    // Arm for the NEXT transition from the current pin state for any-edge detection.
+    // WUEMR bit=0 = falling edge, bit=1 = rising edge.
+    if (*(gpio->data) & gpio->value)
+        *wuemr |= mask;      // pin HIGH: arm for falling edge (bit=1=falling, next transition)
+    else
+        *wuemr &= ~mask;     // pin LOW: arm for rising edge (bit=0=rising, next transition)
     *wuesr  = mask;          // clear sense register
     *ier   |= BIT(gpio->irq & 7U);
 }

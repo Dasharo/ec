@@ -15,8 +15,8 @@
 #define BIT(n) (1U << (n))
 #endif
 
-// Enable WUC edge detection on a pin. WUEMR bit=1 = rising edge, bit=0 = falling edge.
-// WUC_ENABLE sets bit=1 (rising edge); use WUEMR &= ~BIT(n) for falling edge initially.
+// Enable WUC edge detection on a pin. WUEMR bit=1 = falling edge, bit=0 = rising edge.
+// WUC_ENABLE sets bit=1 (falling edge); use WUEMR &= ~BIT(n) for rising edge initially.
 #define WUC_ENABLE(wuemr, bit)      ((wuemr) |= BIT(bit))
 // ISR ack for any-edge detection: clear WUESR, toggle edge direction, clear WUESR again.
 // The double-clear prevents spurious re-trigger when toggling WUEMR while the GPIO is
