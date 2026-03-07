@@ -302,19 +302,6 @@ void init(void) {
     // Must happen last
     power_init();
     board_init();
-
-    // Set the initial lid and AC states
-    lid_event();
-    acin_event();
-
-    // Sequence the board to the initial state
-    usbpd_event();
-    // If we were woken by power button, power on.
-    if (!gpio_get(&PWR_SW_N))
-        power_on();
-    else
-        power_off();
-    update_power_state();
 }
 
 void main(void) {
@@ -328,6 +315,19 @@ void main(void) {
 
     INFO("System76 EC board '%s', version '%s'\n", board(), version());
     ec_print_reset_reason();
+
+    // Set the initial lid and AC states
+    lid_event();
+    acin_event();
+
+    // Sequence the board to the initial state
+    usbpd_event();
+    // If we were woken by power button, power on.
+    if (!gpio_get(&PWR_SW_N))
+        power_on();
+    else
+        power_off();
+    update_power_state();
 
     for (main_cycle = 0;; main_cycle++) {
         // Idle until next interrupt (~1ms timer_0 or INTC wakeup)
