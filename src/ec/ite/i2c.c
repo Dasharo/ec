@@ -47,8 +47,13 @@ void i2c_reset(struct I2C *i2c, bool kill) {
         // Set kill bit
         if (kill)
             *(i2c->hoctl) |= BIT(1);
-        // Wait for host to finish
-        while (*(i2c->hosta) & HOSTA_BUSY) {}
+        // Wait for host to finish, with timeout to avoid hanging if the
+        // bus is held by external hardware (e.g. DBGR/SMB debugger).
+        uint32_t timeout;
+        for (timeout = I2C_TIMEOUT; timeout > 0; timeout--) {
+            if (!(*(i2c->hosta) & HOSTA_BUSY))
+                break;
+        }
     }
     // Clear status register
     *(i2c->hosta) = *(i2c->hosta);

@@ -761,4 +761,3 @@ void power_led_event(void) {
     }
 #endif // HAVE_LED_BAT_CHG && HAVE_LED_BAT_FULL
 }
-

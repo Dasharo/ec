@@ -2,6 +2,7 @@
 
 board-common-y += acpi.c
 board-common-y += battery.c
+board-common-y += debug_mailbox.c
 board-common-y += config.c
 board-common-y += dgpu.c
 board-common-y += ecpm.c
@@ -50,6 +51,7 @@ endif
 
 # Set external programmer
 PROGRAMMER=$(wildcard /dev/ttyACM* /dev/ttyUSB*)
+
 
 ifeq ($(CONFIG_BUS_ESPI),y)
 CFLAGS += -DCONFIG_BUS_ESPI=1

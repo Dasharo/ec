@@ -8,6 +8,7 @@
 #include <arch/time.h>
 #include <board/battery.h>
 #include <board/board.h>
+#include <board/debug_mailbox.h>
 #include <board/dgpu.h>
 #include <board/ecpm.h>
 #include <board/espi.h>
@@ -39,6 +40,7 @@
 #ifdef PARALLEL_DEBUG
 #include <board/parallel.h>
 #endif // PARALLEL_DEBUG
+
 
 // --------------------------------------------------------------------------
 // SINK_CTRL interrupt routing. Boards override SINK_CTRL_IRQ in gpio.h
@@ -438,6 +440,10 @@ void main(void) {
 
         // Board-specific events
         board_event();
+
+        // DBGR/SMB debug command mailbox (fixed address 0x0DF0)
+        mailbox_event();
+
 
         // Periodic tasks driven by 50 ms timer_0 flag.
         // Counters tick at 50 ms each: power=2 (100ms), fan=5 or 20 (250ms or 1000ms),
