@@ -323,7 +323,7 @@ void main(void) {
     // Sequence the board to the initial state
     usbpd_event();
     // If we were woken by power button, power on.
-    if (!gpio_get(&PWR_SW_N))
+    if (!gpio_get(&PWR_SW_N) && gpio_get(&LID_SW_N))
         power_on();
     else
         power_off();
