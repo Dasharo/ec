@@ -284,5 +284,6 @@ uint16_t keymap_translate(uint16_t key);
 
 #define KF_CUSTOM (0x0200)
 #define K_FNLOCK (KF_CUSTOM | 0x01)
+#define K_KB_PRIVACY (KF_CUSTOM | 0x02)
 
 #endif // _COMMON_KEYMAP_H

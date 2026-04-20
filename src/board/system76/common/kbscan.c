@@ -3,6 +3,7 @@
 #include <arch/delay.h>
 #include <arch/time.h>
 #include <board/acpi.h>
+#include <board/options.h>
 #include <board/fan.h>
 #include <board/gpio.h>
 #include <board/keymap.h>
@@ -22,6 +23,17 @@
 
 bool kbscan_fn_held = false;
 bool kbscan_esc_held = false;
+
+bool kb_privacy_enabled = false;
+static uint16_t kb_privacy_lfsr;
+
+static uint8_t kb_privacy_rand(uint8_t max) {
+    if (!kb_privacy_lfsr)
+        kb_privacy_lfsr = (uint16_t)(time_get() | 1u);
+    uint16_t bit = kb_privacy_lfsr & 1u;
+    kb_privacy_lfsr = (kb_privacy_lfsr >> 1) ^ (uint16_t)(bit ? 0xB400u : 0u);
+    return (uint8_t)(kb_privacy_lfsr % max);
+}
 
 bool kbscan_enabled = false;
 uint16_t kbscan_repeat_period = 91;
@@ -58,6 +70,8 @@ void kbscan_init(void) {
     KSIGCTRL = 0;
     KSIGOEN = 0;
     KSIGDAT = 0;
+
+    kb_privacy_enabled = (bool)options_get(OPT_KB_PRIVACY);
 }
 
 // Debounce time in milliseconds
@@ -208,9 +222,21 @@ bool kbscan_press(uint16_t key, bool pressed, uint8_t *layer) {
         return true;
     }
 
+    if (key == K_KB_PRIVACY && pressed) {
+        DEBUG("Toggling KB privacy\n");
+        kb_privacy_enabled ^= 1;
+        options_set(OPT_KB_PRIVACY, (uint8_t)kb_privacy_enabled);
+        return true;
+    }
+
     switch (key & KT_MASK) {
     case (KT_NORMAL):
         if (kbscan_enabled) {
+            if (kb_privacy_enabled) {
+                uint8_t max_delay = options_get(OPT_KB_PRIVACY_MAX_DELAY);
+                if (max_delay)
+                    delay_ms(kb_privacy_rand(max_delay));
+            }
             kbc_scancode(key, pressed);
         }
         break;

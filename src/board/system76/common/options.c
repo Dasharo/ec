@@ -17,6 +17,8 @@ uint8_t DEFAULT_OPTIONS[NUM_OPTIONS] = {
     [OPT_ALLOW_BAT_BOOST] = 0,
     [OPT_ALWAYS_ON_USB] = 0,
     [OPT_GPU_MUX_CTRL] = 0,
+    [OPT_KB_PRIVACY] = 0,
+    [OPT_KB_PRIVACY_MAX_DELAY] = 100,
 };
 // clang-format on
 
