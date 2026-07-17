@@ -14,6 +14,7 @@
 #include <board/power.h>
 #include <common/macro.h>
 #include <common/debug.h>
+#include <common/rng.h>
 
 // Default to not n-key rollover
 #ifndef KM_NKEY
@@ -202,6 +203,13 @@ bool kbscan_press(uint16_t key, bool pressed, uint8_t *layer) {
         pmc_swi();
     }
 
+    if (key == K_KB_PRIVACY && pressed) {
+        DEBUG("Toggling keyboard privacy\n");
+        rng_seed(time_get());
+        kbc_toggle_delay_randomization();
+        return true;
+    }
+
     if (key == K_FNLOCK && pressed) {
         DEBUG("Toggling FnLock\n");
         keymap_fnlock ^= 1;
@@ -316,6 +324,7 @@ static inline bool key_should_repeat(uint16_t key) {
     case K_CAMERA_TOGGLE:
     case K_DISPLAY_TOGGLE:
     case K_FAN_TOGGLE:
+    case K_KB_PRIVACY:
     case K_KBD_BKL:
     case K_KBD_COLOR:
     case K_KBD_TOGGLE:

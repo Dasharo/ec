@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "include/board/options.h"
 #include <arch/delay.h>
+#include <arch/time.h>
 #include <board/kbc.h>
 #include <board/kbscan.h>
 #include <board/keymap.h>
 #include <common/debug.h>
 #include <common/macro.h>
+#include <common/rng.h>
 #include <ec/espi.h>
 #include <ec/ps2.h>
 
@@ -80,9 +83,12 @@ static const uint16_t kbc_typematic_period[32] = {
 };
 // clang-format on
 
-static uint8_t kbc_buffer[16] = { 0 };
+static uint8_t kbc_buffer[32] = { 0 };
 static uint8_t kbc_buffer_head = 0;
 static uint8_t kbc_buffer_tail = 0;
+
+static bool kbc_buffer_privacy = false;
+static uint8_t kbc_buffer_privacy_next_time = 0;
 
 static bool kbc_buffer_pop(uint8_t *scancode) {
     if (kbc_buffer_head == kbc_buffer_tail) {
@@ -459,8 +465,23 @@ void kbc_event(struct Kbc *kbc) {
     uint8_t sts;
 
     // Read from scancode buffer when possible
-    if (state == KBC_STATE_NORMAL && kbc_buffer_pop(&state_data)) {
-        state = KBC_STATE_KEYBOARD;
+    if (state == KBC_STATE_NORMAL) {
+        if (options_get(OPT_KB_PRIVACY)) {
+            uint8_t time = time_get();
+            if (time >= kbc_buffer_privacy_next_time) {
+                TRACE("KB_Priv: dleay of %d passed\n", kbc_buffer_privacy_next_time);
+                if (kbc_buffer_pop(&state_data)) {
+                    state = KBC_STATE_KEYBOARD;
+                    kbc_buffer_privacy_next_time = time +
+                        (uint16_t)(nondeterministic_rng() %
+                                   (uint16_t)options_get(OPT_KB_PRIVACY_MAX_DELAY_MS));
+                }
+            }
+        } else {
+            if (kbc_buffer_pop(&state_data)) {
+                state = KBC_STATE_KEYBOARD;
+            }
+        }
     }
 
     // Read from touchpad when possible
@@ -520,4 +541,8 @@ void kbc_event(struct Kbc *kbc) {
     else if (!(sts & KBC_STS_OBF)) {
         kbc_on_output_empty(kbc);
     }
+}
+
+void kbc_toggle_delay_randomization() {
+    options_set(OPT_KB_PRIVACY, options_get(OPT_KB_PRIVACY) ^ 1);
 }

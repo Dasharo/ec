@@ -35,7 +35,7 @@ uint8_t kbc_status(struct Kbc *kbc);
 uint8_t kbc_read(struct Kbc *kbc);
 bool kbc_keyboard(struct Kbc *kbc, uint8_t data, uint16_t timeout);
 bool kbc_mouse(struct Kbc *kbc, uint8_t data, uint16_t timeout);
-
+void kbc_toggle_delay_randomization();
 volatile uint8_t __xdata __at(0x1300) KBHICR;
 volatile uint8_t __xdata __at(0x1302) KBIRQR;
 volatile uint8_t __xdata __at(0x1304) KBHISR;
