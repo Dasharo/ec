@@ -88,7 +88,8 @@ static uint8_t kbc_buffer_head = 0;
 static uint8_t kbc_buffer_tail = 0;
 
 static bool kbc_buffer_privacy = false;
-static uint8_t kbc_buffer_privacy_next_time = 0;
+static uint32_t kbc_buffer_privacy_last_time = 0;
+static uint16_t kbc_buffer_privacy_delay = 0;
 
 static bool kbc_buffer_pop(uint8_t *scancode) {
     if (kbc_buffer_head == kbc_buffer_tail) {
@@ -467,14 +468,14 @@ void kbc_event(struct Kbc *kbc) {
     // Read from scancode buffer when possible
     if (state == KBC_STATE_NORMAL) {
         if (options_get(OPT_KB_PRIVACY)) {
-            uint8_t time = time_get();
-            if (time >= kbc_buffer_privacy_next_time) {
-                TRACE("KB_Priv: dleay of %d passed\n", kbc_buffer_privacy_next_time);
+            uint32_t time = time_get();
+            if (time - kbc_buffer_privacy_last_time >= (uint32_t)kbc_buffer_privacy_delay) {
+                TRACE("KB_Priv: delay of %d passed\n", kbc_buffer_privacy_delay);
                 if (kbc_buffer_pop(&state_data)) {
                     state = KBC_STATE_KEYBOARD;
-                    kbc_buffer_privacy_next_time = time +
-                        (uint16_t)(nondeterministic_rng() %
-                                   (uint16_t)options_get(OPT_KB_PRIVACY_MAX_DELAY_MS));
+                    kbc_buffer_privacy_last_time = time;
+                    kbc_buffer_privacy_delay = (uint16_t)(nondeterministic_rng() %
+                                                          options_get(OPT_KB_PRIVACY_MAX_DELAY_MS));
                 }
             }
         } else {
