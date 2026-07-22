@@ -14,6 +14,7 @@ CFLAGS+=-DUSE_S0IX=1
 
 # Include keyboard
 KEYBOARD=14in_83
+KEYMAP=combo_iso_ansi_micmute
 
 # Set keyboard LED mechanism
 KBLED=white_dac
