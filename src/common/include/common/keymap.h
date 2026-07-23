@@ -113,6 +113,25 @@ uint16_t keymap_translate(uint16_t key);
 // Mic mute
 #define K_MIC_MUTE (KF_E0 | 0x76)
 
+// Optional keys
+//
+// Use `IF_CONFIG(FLAG, on_code, off_code)` in a keymap to allow
+// variable keycode depending on whether a flag is set in the boards .mk file.
+// Board opts in with CFLAGS+=-DHAVE_<FEATURE>=1 in its board.mk
+#define IF_CONFIG(flag, on, off) IF_CONFIG_(flag, on, off)
+#define IF_CONFIG_(flag, on, off) IF_CONFIG_SEL_##flag(on, off)
+#define IF_CONFIG_SEL_0(on, off) (off)
+#define IF_CONFIG_SEL_1(on, off) (on)
+
+// Must define defaults for the optional key flags for the macros to work
+#ifndef HAVE_MIC_MUTE
+#define HAVE_MIC_MUTE 0
+#endif
+
+#ifndef HAVE_KB_PRIVACY
+#define HAVE_KB_PRIVACY 0
+#endif
+
 // Function keys
 
 #define K_F1 (0x05)

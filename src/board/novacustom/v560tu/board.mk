@@ -14,7 +14,9 @@ CFLAGS+=-DUSE_S0IX=1
 
 # Include keyboard
 KEYBOARD = 15in_102
-KEYMAP=micmute
+KEYMAP=default
+CFLAGS += \
+	-DHAVE_MIC_MUTE=1
 
 # Set keyboard LED mechanism
 KBLED = rgb_pwm
