@@ -83,13 +83,19 @@ static const uint16_t kbc_typematic_period[32] = {
 };
 // clang-format on
 
-static uint8_t kbc_buffer[32] = { 0 };
+static uint8_t kbc_buffer[64] = { 0 };
 static uint8_t kbc_buffer_head = 0;
 static uint8_t kbc_buffer_tail = 0;
 
 static bool kbc_buffer_privacy = false;
-static uint32_t kbc_buffer_privacy_last_time = 0;
+static uint32_t kbc_buffer_privacy_release_at = 0;
 static uint16_t kbc_buffer_privacy_delay = 0;
+
+static void kbc_buffer_privacy_arm(uint32_t now) {
+    uint16_t max = (uint16_t)options_get(OPT_KB_PRIVACY_MAX_DELAY_MS);
+    kbc_buffer_privacy_delay = (max == 0) ? 0 : (uint16_t)(nondeterministic_rng() % max);
+    kbc_buffer_privacy_release_at = now + kbc_buffer_privacy_delay;
+}
 
 static bool kbc_buffer_pop(uint8_t *scancode) {
     if (kbc_buffer_head == kbc_buffer_tail) {
@@ -101,16 +107,23 @@ static bool kbc_buffer_pop(uint8_t *scancode) {
 }
 
 static bool kbc_buffer_push(uint8_t *scancodes, uint8_t len) {
+    uint8_t i;
     //TODO: make this test more efficient
-    for (uint8_t i = 0; i < len; i++) {
+    for (i = 0; i < len; i++) {
         if ((kbc_buffer_tail + i + 1U) % ARRAY_SIZE(kbc_buffer) == kbc_buffer_head) {
+            TRACE("    KB_Priv: buffer full, dropping %d scancodes\n", len);
             return false;
         }
     }
 
-    for (uint8_t i = 0; i < len; i++) {
+    bool was_empty = (kbc_buffer_head == kbc_buffer_tail);
+    for (i = 0; i < len; i++) {
         kbc_buffer[kbc_buffer_tail] = scancodes[i];
         kbc_buffer_tail = (kbc_buffer_tail + 1U) % ARRAY_SIZE(kbc_buffer);
+    }
+
+    if (was_empty && options_get(OPT_KB_PRIVACY)) {
+        kbc_buffer_privacy_arm(time_get());
     }
     return true;
 }
@@ -469,13 +482,14 @@ void kbc_event(struct Kbc *kbc) {
     if (state == KBC_STATE_NORMAL) {
         if (options_get(OPT_KB_PRIVACY)) {
             uint32_t time = time_get();
-            if (time - kbc_buffer_privacy_last_time >= (uint32_t)kbc_buffer_privacy_delay) {
+            if (kbc_buffer_head != kbc_buffer_tail &&
+                (int32_t)(time - kbc_buffer_privacy_release_at) >= 0) {
                 TRACE("KB_Priv: delay of %d passed\n", kbc_buffer_privacy_delay);
                 if (kbc_buffer_pop(&state_data)) {
                     state = KBC_STATE_KEYBOARD;
-                    kbc_buffer_privacy_last_time = time;
-                    kbc_buffer_privacy_delay = (uint16_t)(nondeterministic_rng() %
-                                                          options_get(OPT_KB_PRIVACY_MAX_DELAY_MS));
+                    if (kbc_buffer_head != kbc_buffer_tail) {
+                        kbc_buffer_privacy_arm(time);
+                    }
                 }
             }
         } else {
