@@ -21,6 +21,8 @@ Usage: ./$(basename "${0}")
   Environmental variables:
     EC_BOARD_VENDOR        name of the board vendor (required)
     EC_BOARD_MODEL         name of the board model (required)
+    DOCKER_UID             user ID to run Docker container as (default: current user ID)
+                           Set to 'root' for rootless Docker setups
 
 Example usage to build for NovaCustom NV40 series:
     EC_BOARD_VENDOR=clevo EC_BOARD_MODEL=nv40mz ./$(basename "$0")
@@ -70,7 +72,8 @@ if [ "$EC_BOARD_VENDOR" = "novacustom" ] ; then
   esac
 fi
 
-docker run --rm -v "$PWD":"$PWD" -w "$PWD" -u "$(id -u)" \
+DOCKER_UID="${DOCKER_UID:-$(id -u)}"
+docker run --rm -v "$PWD":"$PWD" -w "$PWD" -u "$DOCKER_UID" \
   ghcr.io/dasharo/ec-sdk:main make BOARD="${EC_BOARD_VENDOR}/${EC_BOARD_MODEL}"
 errorCheck "Failed to build EC firmware"
 
