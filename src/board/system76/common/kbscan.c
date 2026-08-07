@@ -20,6 +20,13 @@
 #ifndef KM_NKEY
 #define KM_NKEY 0
 #endif // KM_NKEY
+// Default to WLAN_EN being available, as in wireless.c
+#ifndef HAVE_WLAN_EN
+#define HAVE_WLAN_EN 1
+#endif // HAVE_WLAN_EN
+#ifndef HAVE_WLAN_PWR_EN
+#define HAVE_WLAN_PWR_EN 1
+#endif // HAVE_WLAN_PWR_EN
 
 bool kbscan_fn_held = false;
 bool kbscan_esc_held = false;
@@ -175,6 +182,17 @@ static void hardware_hotkey(uint16_t key) {
     case K_CAMERA_TOGGLE:
         if (camera_switch_enabled)
             gpio_set(&CCD_EN, !gpio_get(&CCD_EN));
+        break;
+    case K_AIRPLANE_MODE:
+#if HAVE_BT_EN
+        gpio_set(&BT_EN, !gpio_get(&BT_EN));
+#endif
+#if HAVE_WLAN_EN
+        gpio_set(&WLAN_EN, !gpio_get(&WLAN_EN));
+#endif
+#if HAVE_WLAN_PWR_EN
+        gpio_set(&WLAN_PWR_EN, !gpio_get(&WLAN_PWR_EN));
+#endif
         break;
     case K_FAN_TOGGLE:
         fan_max = !fan_max;
