@@ -153,6 +153,11 @@ enum PowerState calculate_power_state(void) {
 #if CONFIG_BUS_ESPI
     // Use eSPI virtual wires if available
 
+    if (espi_vw_stale) {
+        // PCH has not sent its state since the EC reset
+        return POWER_STATE_S5;
+    }
+
     if (vw_get(&VW_SLP_S5_N) != VWS_HIGH) {
         // S5 plane not powered
         return POWER_STATE_S5;

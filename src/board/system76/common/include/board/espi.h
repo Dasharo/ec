@@ -8,6 +8,8 @@
 #include <ec/espi.h>
 
 extern bool espi_host_reset;
+// Virtual wires still hold values from before the EC reset
+extern bool espi_vw_stale;
 
 void espi_init(void);
 void espi_reset(void);

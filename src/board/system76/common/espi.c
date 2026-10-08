@@ -41,6 +41,7 @@
     }
 
 bool espi_host_reset = false;
+bool espi_vw_stale = true;
 
 void espi_init(void) {
     if (PLLFREQ != 0b0111) {
@@ -93,6 +94,12 @@ void espi_init(void) {
     // Set maximum eSPI frequency to 50MHz
     DEBUG_SET(ESGCAC2, 0b111, 0b011);
 
+    // Virtual wires are in the host domain and survive an EC domain reset,
+    // such as the watchdog reset after flashing. They can't be cleared by the
+    // EC, so ignore them until the PCH sends VWIDX2 again. Discard update
+    // flags left over from before the reset, so they don't count as fresh.
+    VWCTRL1 = VWCTRL1;
+
     espi_event();
 }
 
@@ -125,6 +132,9 @@ void espi_event(void) {
 
         if (value & BIT(0)) {
             DEBUG("VWIDX2 %X\n", VWIDX2);
+
+            // PCH has sent its current state
+            espi_vw_stale = false;
         }
         if (value & BIT(1)) {
             DEBUG("VWIDX3 %X\n", VWIDX3);
