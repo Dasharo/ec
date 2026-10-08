@@ -28,6 +28,12 @@
 #define BATTERY_DISCHARGE_DEADBAND_MA 10
 #endif
 
+// When no start threshold is configured, resume charging once the battery
+// self-discharges this many percent below the end threshold.
+#ifndef BATTERY_RECHARGE_HYSTERESIS
+#define BATTERY_RECHARGE_HYSTERESIS 5
+#endif
+
 #ifndef AC_ADAPTER_VOLTAGE
 #define AC_ADAPTER_VOLTAGE 19
 #endif
@@ -46,6 +52,8 @@ struct battery_info {
     uint16_t cycle_count;
     uint16_t design_capacity;
     uint16_t design_voltage;
+    uint16_t charging_current;
+    uint16_t charging_voltage;
 };
 extern struct battery_info battery_info;
 

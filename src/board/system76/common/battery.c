@@ -47,17 +47,37 @@ bool battery_set_end_threshold(uint8_t value) {
  */
 int16_t battery_charger_configure(void) {
     static bool should_charge = false;
+    // Charging was stopped because the end threshold was reached
+    static bool stopped_at_end = false;
+    uint8_t end = battery_get_end_threshold();
+    uint8_t start = battery_get_start_threshold();
 
-    if (battery_info.charge >= battery_get_end_threshold()) {
-        // Stop threshold configured: Stop charging at threshold.
-        should_charge = false;
-    } else if (battery_info.charge < battery_get_start_threshold()) {
-        // Start threshold configured: Start charging at threshold.
-        should_charge = true;
+    if (start == BATTERY_START_DEFAULT) {
+        // No start threshold configured: Charge up to the end threshold. Once
+        // stopped there, restart charging only after the battery
+        // self-discharges below the hysteresis band.
+        if (stopped_at_end)
+            start = end > BATTERY_RECHARGE_HYSTERESIS ? end - BATTERY_RECHARGE_HYSTERESIS : 0;
+        else
+            start = end;
     }
 
-    if (should_charge)
+    if (battery_info.charge >= end) {
+        // Stop threshold configured: Stop charging at threshold.
+        should_charge = false;
+        stopped_at_end = true;
+    } else if (battery_info.charge < start) {
+        // Start threshold reached: Start charging only if the battery
+        // requests it, per Smart Battery Data Specification rev 1.1
+        // ChargingCurrent() and ChargingVoltage().
+        if (battery_info.charging_current && battery_info.charging_voltage)
+            should_charge = true;
+    }
+
+    if (should_charge) {
+        stopped_at_end = false;
         return battery_charger_enable();
+    }
     return battery_charger_disable();
 }
 
@@ -82,6 +102,8 @@ void battery_event(void) {
     command(battery_info.cycle_count, 0x17);
     command(battery_info.design_capacity, 0x18);
     command(battery_info.design_voltage, 0x19);
+    command(battery_info.charging_current, 0x14);
+    command(battery_info.charging_voltage, 0x15);
 
 #undef command
 
