@@ -19,6 +19,7 @@ uint8_t DEFAULT_OPTIONS[NUM_OPTIONS] = {
     [OPT_GPU_MUX_CTRL] = 0,
     [OPT_KB_PRIVACY] = 0,
     [OPT_KB_PRIVACY_MAX_DELAY_MS] = 100,
+    [OPT_FIRST_BOOT_DONE] = 0,
 };
 // clang-format on
 

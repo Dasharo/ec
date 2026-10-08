@@ -561,6 +561,18 @@ void power_event(void) {
         battery_charger_configure();
     }
 
+    // Power on once after the EC firmware is flashed. Flashing erases the
+    // options sector, so the flag is back at its default value of 0.
+    static bool first_boot_checked = false;
+    if (!first_boot_checked) {
+        first_boot_checked = true;
+        if (!options_get(OPT_FIRST_BOOT_DONE)) {
+            // Save the flag before powering on to avoid a power on loop
+            options_set(OPT_FIRST_BOOT_DONE, 1);
+            power_on();
+        }
+    }
+
     // Read power switch state
     static bool ps_last = true;
     bool ps_new = gpio_get(&PWR_SW_N);
