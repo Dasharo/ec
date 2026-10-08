@@ -66,6 +66,10 @@ bool battery_set_start_threshold(uint8_t value);
 uint8_t battery_get_end_threshold(void);
 bool battery_set_end_threshold(uint8_t value);
 
+bool battery_requests_charge(void);
+uint16_t battery_charge_current_ma(void);
+uint16_t battery_charge_voltage_mv(void);
+
 int16_t battery_charger_configure(void);
 void battery_event(void);
 

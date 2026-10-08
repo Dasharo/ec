@@ -50,18 +50,18 @@
 #define CHARGE_CURRENT_MASK 0x1FC0
 
 #if CHARGER_BATTERY_RSENSE == 5
-    #define CHARGE_CURRENT (MIN((CHARGER_CHARGE_CURRENT >> 1), CHARGE_CURRENT_MASK) & CHARGE_CURRENT_MASK)
+    #define CHARGE_CURRENT(X) (MIN(((X) >> 1), CHARGE_CURRENT_MASK) & CHARGE_CURRENT_MASK)
 #elif CHARGER_BATTERY_RSENSE == 10
-    #define CHARGE_CURRENT (MIN(CHARGER_CHARGE_CURRENT, CHARGE_CURRENT_MASK) & CHARGE_CURRENT_MASK)
+    #define CHARGE_CURRENT(X) (MIN((X), CHARGE_CURRENT_MASK) & CHARGE_CURRENT_MASK)
 #elif CHARGER_BATTERY_RSENSE == 20
-    #define CHARGE_CURRENT (MIN((CHARGER_CHARGE_CURRENT << 1), CHARGE_CURRENT_MASK) & CHARGE_CURRENT_MASK)
+    #define CHARGE_CURRENT(X) (MIN(((X) << 1), CHARGE_CURRENT_MASK) & CHARGE_CURRENT_MASK)
 #else
     #error Invalid battery RSENSE value
 #endif
 
 // Bits 0-3, 15 are ignored.
 #define CHARGE_VOLTAGE_MASK 0x7FF0
-#define CHARGE_VOLTAGE (MIN(CHARGER_CHARGE_VOLTAGE, CHARGE_VOLTAGE_MASK) & CHARGE_VOLTAGE_MASK)
+#define CHARGE_VOLTAGE(X) (MIN((X), CHARGE_VOLTAGE_MASK) & CHARGE_VOLTAGE_MASK)
 
 // Bits 0-6 are ignored. Bits 13-15 must be 0.
 #define INPUT_CURRENT_MASK 0x1F80
@@ -99,6 +99,40 @@ bool battery_charger_is_enabled(void) {
     return charger_enabled;
 }
 
+// Last values written to the charge current and voltage registers
+static uint16_t charge_current_reg = 0;
+static uint16_t charge_voltage_reg = 0;
+
+// Program the charge current and voltage requested by the battery, clamped to
+// board limits. Registers are only written when the value changes, unless
+// forced.
+static int16_t charger_set_charge(bool force) {
+    int16_t res = 0;
+    uint16_t current = battery_charge_current_ma();
+    uint16_t voltage = battery_charge_voltage_mv();
+
+    current = CHARGE_CURRENT(current);
+    voltage = CHARGE_VOLTAGE(voltage);
+
+    if (force || current != charge_current_reg) {
+        // Set charge current in mA
+        res = smbus_write(CHARGER_ADDRESS, REG_CHARGE_CURRENT, current);
+        if (res < 0)
+            return res;
+        charge_current_reg = current;
+    }
+
+    if (force || voltage != charge_voltage_reg) {
+        // Set charge voltage in mV
+        res = smbus_write(CHARGER_ADDRESS, REG_CHARGE_VOLTAGE, voltage);
+        if (res < 0)
+            return res;
+        charge_voltage_reg = voltage;
+    }
+
+    return 0;
+}
+
 int16_t battery_charger_disable(void) {
     int16_t res = 0;
 
@@ -116,11 +150,13 @@ int16_t battery_charger_disable(void) {
     res = smbus_write(CHARGER_ADDRESS, REG_CHARGE_CURRENT, 0);
     if (res < 0)
         return res;
+    charge_current_reg = 0;
 
     // Disable charge voltage
     res = smbus_write(CHARGER_ADDRESS, REG_CHARGE_VOLTAGE, 0);
     if (res < 0)
         return res;
+    charge_voltage_reg = 0;
 
     // Disable input current
     res = smbus_write(CHARGER_ADDRESS, REG_INPUT_CURRENT, 0);
@@ -143,13 +179,8 @@ int16_t battery_charger_enable(void) {
     if (res < 0)
         return res;
 
-    // Set charge current in mA
-    res = smbus_write(CHARGER_ADDRESS, REG_CHARGE_CURRENT, CHARGE_CURRENT);
-    if (res < 0)
-        return res;
-
-    // Set charge voltage in mV
-    res = smbus_write(CHARGER_ADDRESS, REG_CHARGE_VOLTAGE, CHARGE_VOLTAGE);
+    // Set charge current and voltage requested by the battery
+    res = charger_set_charge(true);
     if (res < 0)
         return res;
 
@@ -193,6 +224,10 @@ int16_t battery_charger_enable(void) {
 
 void battery_charger_event(void) {
     //TODO: watchdog
+
+    // Follow changes in the charge current and voltage requested by the battery
+    if (charger_enabled)
+        charger_set_charge(false);
 }
 
 void battery_debug(void) {

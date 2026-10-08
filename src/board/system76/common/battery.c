@@ -4,6 +4,7 @@
 #include <board/options.h>
 #include <board/smbus.h>
 #include <common/debug.h>
+#include <common/macro.h>
 
 struct battery_info battery_info = { 0 };
 
@@ -43,6 +44,30 @@ bool battery_set_end_threshold(uint8_t value) {
 }
 
 /**
+ * Whether the battery requests to be charged, per Smart Battery Data
+ * Specification rev 1.1 ChargingCurrent() and ChargingVoltage().
+ */
+bool battery_requests_charge(void) {
+    return battery_info.charging_current && battery_info.charging_voltage;
+}
+
+/**
+ * Charge current to program, as requested by the battery but never exceeding
+ * the board limit.
+ */
+uint16_t battery_charge_current_ma(void) {
+    return MIN(battery_info.charging_current, CHARGER_CHARGE_CURRENT);
+}
+
+/**
+ * Charge voltage to program, as requested by the battery but never exceeding
+ * the board limit.
+ */
+uint16_t battery_charge_voltage_mv(void) {
+    return MIN(battery_info.charging_voltage, CHARGER_CHARGE_VOLTAGE);
+}
+
+/**
  * Configure the charger based on charging threshold values.
  */
 int16_t battery_charger_configure(void) {
@@ -70,7 +95,7 @@ int16_t battery_charger_configure(void) {
         // Start threshold reached: Start charging only if the battery
         // requests it, per Smart Battery Data Specification rev 1.1
         // ChargingCurrent() and ChargingVoltage().
-        if (battery_info.charging_current && battery_info.charging_voltage)
+        if (battery_requests_charge())
             should_charge = true;
     }
 

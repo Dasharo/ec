@@ -91,7 +91,7 @@ uint8_t acpi_read(uint8_t addr) {
             // status flags rather than from the sign of the instantaneous
             // current, which fluctuates around zero when the battery is full
             // or the charger is idle, making the OS flip between states.
-            if (battery_charger_is_enabled() &&
+            if (battery_charger_is_enabled() && battery_requests_charge() &&
                 !(battery_info.status & BATTERY_FULLY_CHARGED)) {
                 // Battery is charging
                 data |= BIT(1);
