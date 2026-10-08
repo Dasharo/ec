@@ -16,7 +16,17 @@
 #define CHARGER_ADDRESS 0x09
 #endif
 
+// Smart Battery BatteryStatus() flags
+#define BATTERY_FULLY_CHARGED BIT(5)
 #define BATTERY_INITIALIZED BIT(7)
+
+// Discharge current below which a fully charged battery on AC is not
+// reported as discharging. Some charger, battery and adapter combinations
+// make the battery leak a trivial amount of current, which would otherwise
+// cause the OS to rapidly flip between charge states.
+#ifndef BATTERY_DISCHARGE_DEADBAND_MA
+#define BATTERY_DISCHARGE_DEADBAND_MA 10
+#endif
 
 #ifndef AC_ADAPTER_VOLTAGE
 #define AC_ADAPTER_VOLTAGE 19
@@ -54,6 +64,7 @@ void battery_event(void);
 // Defined by charger/*.c
 int16_t battery_charger_disable(void);
 int16_t battery_charger_enable(void);
+bool battery_charger_is_enabled(void);
 void battery_charger_event(void);
 void battery_debug(void);
 

@@ -84,6 +84,10 @@ enum sense_resistor {
 // XXX: Assumption: ac_last is initialized high.
 static bool charger_enabled = false;
 
+bool battery_charger_is_enabled(void) {
+    return charger_enabled;
+}
+
 int16_t battery_charger_disable(void) {
     int16_t res = 0;
 

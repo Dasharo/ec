@@ -87,13 +87,25 @@ uint8_t acpi_read(uint8_t addr) {
         ACPI_16(0x22, battery_info.design_voltage);
 
         case 0x26:
-            // If battery is not fully charged
-            if ((int16_t)battery_info.current > 0) {
+            // Derive the charge state from the charger state and the battery
+            // status flags rather than from the sign of the instantaneous
+            // current, which fluctuates around zero when the battery is full
+            // or the charger is idle, making the OS flip between states.
+            if (battery_charger_is_enabled() &&
+                !(battery_info.status & BATTERY_FULLY_CHARGED)) {
                 // Battery is charging
                 data |= BIT(1);
-            } else if ((int16_t)battery_info.current < 0) {
-                // Battery isn't charging
+            } else if (gpio_get(&ACIN_N)) {
+                // On battery power, battery is discharging
                 data |= BIT(0);
+            } else if ((int16_t)battery_info.current < 0) {
+                // On AC with charger idle, battery is discharging, e.g. to
+                // supplement the adapter. Ignore trivial discharge current
+                // when the battery reports being fully charged.
+                if (!(battery_info.status & BATTERY_FULLY_CHARGED) ||
+                    (int16_t)battery_info.current <= -BATTERY_DISCHARGE_DEADBAND_MA) {
+                    data |= BIT(0);
+                }
             }
             break;
 
