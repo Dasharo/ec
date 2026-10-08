@@ -122,6 +122,28 @@ static int16_t charger_set_charge(bool force) {
     return 0;
 }
 
+// Last value written to the input current register
+static uint16_t input_current_reg = 0;
+
+// Program the adapter input current limit. The register is only written when
+// the value changes, unless forced.
+static int16_t charger_set_input_current(bool force) {
+    int16_t res = 0;
+    uint16_t current = battery_charger_input_current_ma;
+
+    current = INPUT_CURRENT(current);
+
+    if (force || current != input_current_reg) {
+        // Set input current in mA
+        res = smbus_write(CHARGER_ADDRESS, REG_ADAPTER_CURRENT, current);
+        if (res < 0)
+            return res;
+        input_current_reg = current;
+    }
+
+    return 0;
+}
+
 int16_t battery_charger_disable(void) {
     int16_t res = 0;
 
@@ -160,8 +182,9 @@ int16_t battery_charger_disable(void) {
         return res;
     charge_voltage_reg = 0;
 
-    // Disable input current
-    res = smbus_write(CHARGER_ADDRESS, REG_ADAPTER_CURRENT, 0);
+    // Keep the input current limit, so the adapter keeps powering the system
+    // instead of the battery supplementing it through Hybrid Power Boost
+    res = charger_set_input_current(true);
     if (res < 0)
         return res;
 
@@ -204,11 +227,7 @@ int16_t battery_charger_enable(void) {
         return res;
 
     // Set input current in mA
-    res = smbus_write(
-        CHARGER_ADDRESS,
-        REG_ADAPTER_CURRENT,
-        INPUT_CURRENT((uint32_t)battery_charger_input_current_ma)
-    );
+    res = charger_set_input_current(true);
     if (res < 0)
         return res;
 
@@ -218,6 +237,9 @@ int16_t battery_charger_enable(void) {
 }
 
 void battery_charger_event(void) {
+    // Follow changes in the input current limit, also while not charging
+    charger_set_input_current(false);
+
     // Follow changes in the charge current and voltage requested by the
     // battery, always rewriting them to avoid watchdog timeout
     if (charger_enabled)
