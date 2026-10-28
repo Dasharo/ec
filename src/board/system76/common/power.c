@@ -692,6 +692,11 @@ void power_event(void) {
         if (power_state == POWER_STATE_S5) {
             power_off();
 
+#if CONFIG_EC_FDOPSS_OVERRIDE
+            // Flash descriptor override is one boot only: clear it on power off
+            gpio_set(&ME_WE, false);
+#endif // CONFIG_EC_FDOPSS_OVERRIDE
+
 #if CONFIG_SECURITY
             // Handle security state changes if necessary
             if (security_power()) {

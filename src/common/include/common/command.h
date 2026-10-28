@@ -60,6 +60,8 @@ enum Command {
     CMD_OPTION_GET = 25,
     // Set a persistent option by index
     CMD_OPTION_SET = 26,
+    // Drive the flash descriptor security override strap (ME_WE) for one boot
+    CMD_ME_OVERRIDE_SET = 27,
     //TODO
 };
 

@@ -48,6 +48,12 @@ ifeq ($(CONFIG_SECURITY),y)
 CFLAGS+=-DCONFIG_SECURITY=1
 endif
 
+ifeq ($(CONFIG_EC_FDOPSS_OVERRIDE),y)
+CFLAGS+=-DCONFIG_EC_FDOPSS_OVERRIDE=1
+endif
+
+
+
 # Set external programmer
 PROGRAMMER=$(wildcard /dev/ttyACM* /dev/ttyUSB*)
 

@@ -9,6 +9,9 @@ CONFIG_EC_ITE_IT5570E = y
 # Enable eSPI
 CONFIG_BUS_ESPI = y
 
+# Enable disabling ME via an EC command
+CONFIG_EC_FDOPSS_OVERRIDE=y
+
 # Use S0ix
 CFLAGS+=-DUSE_S0IX=1
 

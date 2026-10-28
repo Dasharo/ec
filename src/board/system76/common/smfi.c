@@ -274,6 +274,14 @@ static enum Result cmd_option_get(void) {
     return RES_OK;
 }
 
+#if CONFIG_EC_FDOPSS_OVERRIDE
+static enum Result cmd_me_override_set(void) {
+    gpio_set(&ME_WE, smfi_cmd[SMFI_CMD_DATA]);
+    TRACE("ME override %sABLED\n", smfi_cmd[SMFI_CMD_DATA] ? "EN" : "DIS");
+    return RES_OK;
+}
+#endif // CONFIG_EC_FDOPSS_OVERRIDE
+
 static enum Result cmd_option_set(void) {
     return !options_set(smfi_cmd[SMFI_CMD_DATA], smfi_cmd[SMFI_CMD_DATA + 1]);
 }
@@ -428,6 +436,11 @@ void smfi_event(void) {
         case CMD_OPTION_SET:
             smfi_cmd[SMFI_CMD_RES] = cmd_option_set();
             break;
+#if CONFIG_EC_FDOPSS_OVERRIDE
+        case CMD_ME_OVERRIDE_SET:
+            smfi_cmd[SMFI_CMD_RES] = cmd_me_override_set();
+            break;
+#endif // CONFIG_EC_FDOPSS_OVERRIDE
 #if CONFIG_SECURITY
         case CMD_SECURITY_GET:
             smfi_cmd[SMFI_CMD_RES] = cmd_security_get();
