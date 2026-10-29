@@ -651,6 +651,9 @@ void power_event(void) {
 #else // CONFIG_BUS_ESPI
         power_cpu_reset();
 #endif // CONFIG_BUS_ESPI
+#if CONFIG_EC_FDOPSS_OVERRIDE
+        gpio_set(&ME_WE, false);
+#endif // CONFIG_EC_FDOPSS_OVERRIDE
     }
     rst_last = rst_new;
     // clang-format on
@@ -691,11 +694,6 @@ void power_event(void) {
         // Handle powering off when power not needed
         if (power_state == POWER_STATE_S5) {
             power_off();
-
-#if CONFIG_EC_FDOPSS_OVERRIDE
-            // Flash descriptor override is one boot only: clear it on power off
-            gpio_set(&ME_WE, false);
-#endif // CONFIG_EC_FDOPSS_OVERRIDE
 
 #if CONFIG_SECURITY
             // Handle security state changes if necessary
