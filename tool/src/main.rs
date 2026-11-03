@@ -406,6 +406,12 @@ fn main() {
                 .possible_values(&["lock", "unlock"])
             )
         )
+        .subcommand(SubCommand::with_name("acpi")
+            .arg(Arg::with_name("addr")
+                .required(true)
+            )
+            .arg(Arg::with_name("data"))
+        )
         .get_matches();
 
     let get_ec = || -> Result<_, Error> {
@@ -642,6 +648,27 @@ fn main() {
                     eprintln!("failed to set no_input mode: {:X?}", err);
                     process::exit(1);
                 }
+            }
+        },
+        Some(("acpi", sub_m)) => {
+            let parse_u8 = |s: &str| u8::from_str_radix(s.trim_start_matches("0x"), 16);
+            let addr = parse_u8(sub_m.value_of("addr").unwrap()).unwrap();
+            let access = unsafe { ec.access() };
+            match sub_m.value_of("data").map(|s| parse_u8(s).unwrap()) {
+                Some(data) => match unsafe { access.acpi_write(addr, data) } {
+                    Ok(()) => (),
+                    Err(err) => {
+                        eprintln!("failed to write ACPI {:02X} = {:02X}: {:X?}", addr, data, err);
+                        process::exit(1);
+                    },
+                },
+                None => match unsafe { access.acpi_read(addr) } {
+                    Ok(value) => println!("{:02X}", value),
+                    Err(err) => {
+                        eprintln!("failed to read ACPI {:02X}: {:X?}", addr, err);
+                        process::exit(1);
+                    },
+                },
             }
         },
         Some(("security", sub_m)) => {

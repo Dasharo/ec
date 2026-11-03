@@ -7,6 +7,13 @@ const SMFI_DBG_BASE: u16 = 0xF00;
 #[cfg(all(feature = "std", target_os = "linux"))]
 const SMFI_DBG_SIZE: usize = 0x100;
 
+#[cfg(all(feature = "std", target_os = "linux"))]
+const ACPI_EC_BASE: u16 = 0x62;
+#[cfg(all(feature = "std", target_os = "linux"))]
+const ACPI_EC_DATA: u16 = 0;
+#[cfg(all(feature = "std", target_os = "linux"))]
+const ACPI_EC_CMD: u16 = 4;
+
 const SMFI_CMD_CMD: u8 = 0x00;
 const SMFI_CMD_RES: u8 = 0x01;
 const SMFI_CMD_DATA: u8 = 0x02;

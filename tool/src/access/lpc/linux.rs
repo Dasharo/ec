@@ -99,6 +99,7 @@ impl PortLock {
 pub struct AccessLpcLinux {
     cmd: PortLock,
     dbg: PortLock,
+    acpi: PortLock,
     timeout: StdTimeout,
 }
 
@@ -118,11 +119,31 @@ impl AccessLpcLinux {
 
         let cmd = PortLock::new(SMFI_CMD_BASE, SMFI_CMD_BASE + SMFI_CMD_SIZE as u16 - 1)?;
         let dbg = PortLock::new(SMFI_DBG_BASE, SMFI_DBG_BASE + SMFI_DBG_SIZE as u16 - 1)?;
+        let acpi = PortLock::new(ACPI_EC_BASE, ACPI_EC_BASE + ACPI_EC_CMD)?;
         Ok(Self {
             cmd,
             dbg,
+            acpi,
             timeout: StdTimeout::new(timeout),
         })
+    }
+
+    /// Returns Ok if the ACPI EC input buffer is empty
+    unsafe fn acpi_can_write(&mut self) -> Result<(), Error> {
+        if self.acpi.read(ACPI_EC_CMD)? & 2 == 0 {
+            Ok(())
+        } else {
+            Err(Error::WouldBlock)
+        }
+    }
+
+    /// Returns Ok if the ACPI EC output buffer is full
+    unsafe fn acpi_can_read(&mut self) -> Result<(), Error> {
+        if self.acpi.read(ACPI_EC_CMD)? & 1 == 1 {
+            Ok(())
+        } else {
+            Err(Error::WouldBlock)
+        }
     }
 
     /// Read from the command space
@@ -182,5 +203,26 @@ impl Access for AccessLpcLinux {
 
     unsafe fn read_debug(&mut self, addr: u8) -> Result<u8, Error> {
         Ok(self.dbg.read(addr as u16)?)
+    }
+
+    unsafe fn acpi_read(&mut self, addr: u8) -> Result<u8, Error> {
+        self.timeout.reset();
+        timeout!(self.timeout, self.acpi_can_write())?;
+        self.acpi.write(ACPI_EC_CMD, 0x80)?;
+        timeout!(self.timeout, self.acpi_can_write())?;
+        self.acpi.write(ACPI_EC_DATA, addr)?;
+        timeout!(self.timeout, self.acpi_can_read())?;
+        Ok(self.acpi.read(ACPI_EC_DATA)?)
+    }
+
+    unsafe fn acpi_write(&mut self, addr: u8, data: u8) -> Result<(), Error> {
+        self.timeout.reset();
+        timeout!(self.timeout, self.acpi_can_write())?;
+        self.acpi.write(ACPI_EC_CMD, 0x81)?;
+        timeout!(self.timeout, self.acpi_can_write())?;
+        self.acpi.write(ACPI_EC_DATA, addr)?;
+        timeout!(self.timeout, self.acpi_can_write())?;
+        self.acpi.write(ACPI_EC_DATA, data)?;
+        timeout!(self.timeout, self.acpi_can_write())
     }
 }
