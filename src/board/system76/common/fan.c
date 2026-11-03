@@ -18,12 +18,14 @@
 #define PWM_REG(x) concat(DCR, x)
 
 bool fan_max = false;
+bool fan_manual = false;
 uint8_t last_duty_dgpu = 0;
 uint8_t last_duty_peci = 0;
 
 void fan_reset(void) {
     // Do not manually set fans to maximum speed
     fan_max = false;
+    fan_manual = false;
 }
 
 // Get duty cycle based on temperature, adapted from
@@ -66,6 +68,10 @@ uint8_t fan_duty(const struct Fan *fan, int16_t temp) __reentrant {
 }
 
 void fan_duty_set(uint8_t peci_fan_duty, uint8_t dgpu_fan_duty) __reentrant {
+    if (fan_manual) {
+        return;
+    }
+
 #if SYNC_FANS != 0
     peci_fan_duty = peci_fan_duty > dgpu_fan_duty ? peci_fan_duty : dgpu_fan_duty;
     dgpu_fan_duty = peci_fan_duty > dgpu_fan_duty ? peci_fan_duty : dgpu_fan_duty;

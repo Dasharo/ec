@@ -162,6 +162,8 @@ uint8_t acpi_read(uint8_t addr) {
             break;
 #endif // HAVE_LED_AIRPLANE_N
 
+        ACPI_8(0xDB, fan_manual ? 0b11 : 0b00);
+
         // Power engine plug-in hook for S0ix
         case 0xE0:
             data = pep_hook;
@@ -192,6 +194,27 @@ void acpi_write(uint8_t addr, uint8_t data) {
 
     case 0xBD:
         battery_set_end_threshold(data);
+        break;
+
+    // fan duty
+    case 0xCE:
+        if (fan_manual) {
+            PWM_REG(CPU_FAN1) = data;
+        }
+        break;
+    case 0xCF:
+        if (fan_manual) {
+#ifdef CPU_FAN2
+            PWM_REG(CPU_FAN2) = data;
+#endif
+#if HAVE_DGPU
+            PWM_REG(GPU_FAN1) = data;
+#endif
+        }
+        break;
+
+    case 0xDB:
+        fan_manual = (bool)(data & BIT(0));
         break;
 
 #if HAVE_LED_AIRPLANE_N

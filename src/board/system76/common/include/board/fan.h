@@ -56,6 +56,7 @@ struct Fan {
 };
 
 extern bool fan_max;
+extern bool fan_manual;
 
 void fan_reset(void);
 

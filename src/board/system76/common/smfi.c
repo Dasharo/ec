@@ -233,7 +233,7 @@ static enum Result cmd_security_set(void) {
 static enum Result cmd_fan_curve_set(void) {
     struct FanPoint points[4];
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 4; ++i) { // TODO hardcoded 4 points
         points[i].temp = smfi_cmd[2 * i + SMFI_CMD_DATA + 1];
         points[i].duty = smfi_cmd[2 * i + SMFI_CMD_DATA + 2] * 255 / 100;
     }
