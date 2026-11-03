@@ -469,7 +469,7 @@ fn main() {
         },
         Some(("fan", sub_m)) => {
             let index = sub_m.value_of_os("index").unwrap().to_string_lossy().parse::<u8>().unwrap();
-            let duty_opt = sub_m.value_of("duty").map(|x| x.parse::<u8>().unwrap());
+            let duty_opt = sub_m.get_one::<u8>("duty").copied();
             match duty_opt {
                 Some(duty) => match unsafe { fan_set(&mut ec, index, duty) } {
                     Ok(()) => (),
