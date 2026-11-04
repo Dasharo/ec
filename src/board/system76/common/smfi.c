@@ -243,11 +243,13 @@ static enum Result cmd_fan_curve_set(void) {
 
     switch (smfi_cmd[SMFI_CMD_DATA]) {
     case 0:
-        peci_set_fan_curve(4, points);
+        if (peci_set_fan_curve(4, points) != 0)
+            return RES_ERR;
         break;
 #if HAVE_DGPU
     case 1:
-        dgpu_set_fan_curve(4, points);
+        if (dgpu_set_fan_curve(4, points) != 0)
+            return RES_ERR;
         break;
 #endif
     default:

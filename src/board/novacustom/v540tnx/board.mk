@@ -59,6 +59,13 @@ CFLAGS += -DAC_ADAPTER_VOLTAGE=20
 
 # DGPU support
 CFLAGS+=-DHAVE_DGPU=1 -DGPU_FAN1=3
+# Four points, as sent by coreboot with CMD_FAN_CURVE_SET
+CFLAGS+=-DBOARD_DGPU_FAN_POINTS="\
+	FAN_POINT(70, 40), \
+	FAN_POINT(75, 50), \
+	FAN_POINT(80, 60), \
+	FAN_POINT(90, 65) \
+"
 
 # D-notifier support for NVIDIA
 CFLAGS+= -DHAVE_D_NOTIFY=1 \
