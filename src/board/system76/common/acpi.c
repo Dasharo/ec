@@ -26,6 +26,9 @@ enum EcOs acpi_ecos = EC_OS_NONE;
 
 extern bool pmc_s0_hack;
 
+// Result of the last fan curve commit over ACPI: 0 accepted, 1 rejected
+static uint8_t fan_curve_status = 0;
+
 void acpi_reset(void) {
     // Disable lid wake
     lid_wake = false;
@@ -168,6 +171,19 @@ uint8_t acpi_read(uint8_t addr) {
         case 0xE0:
             data = pep_hook;
             break;
+
+        // Fan curve: result of the last commit and the applied points
+        ACPI_8(0xE2, fan_curve_status);
+        case 0xE3:
+        case 0xE4:
+        case 0xE5:
+        case 0xE6:
+        case 0xE7:
+        case 0xE8:
+        case 0xE9:
+        case 0xEA:
+            data = fan_curve_applied[addr - 0xE3];
+            break;
     }
 
     TRACE("acpi_read %02X = %02X\n", addr, data);
@@ -226,6 +242,22 @@ void acpi_write(uint8_t addr, uint8_t data) {
     // Power engine plug-in hook for S0ix
     case 0xE0:
         pep_hook = data;
+        break;
+
+    // Fan curve: commit the pending points to the curves in data
+    case 0xE1:
+        fan_curve_status = fan_curve_commit(data & (FAN_CURVE_CPU | FAN_CURVE_GPU)) ? 1 : 0;
+        break;
+    // Fan curve points, applied by the commit
+    case 0xE3:
+    case 0xE4:
+    case 0xE5:
+    case 0xE6:
+    case 0xE7:
+    case 0xE8:
+    case 0xE9:
+    case 0xEA:
+        fan_curve_pending[addr - 0xE3] = data;
         break;
     }
 }

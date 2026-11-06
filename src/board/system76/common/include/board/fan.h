@@ -60,11 +60,25 @@ struct Fan {
 #define FAN_MANUAL_1 (1 << 0)
 #define FAN_MANUAL_2 (1 << 1)
 
+// Fan curve wire format, as in CMD_FAN_CURVE_SET and ACPI EC RAM 0xE3..0xEA:
+// four points of temperature in degrees C and duty in percent
+#define FAN_CURVE_POINTS 4
+#define FAN_CURVE_BYTES (2 * FAN_CURVE_POINTS)
+
+// Curves a commit applies to, as in ACPI EC RAM 0xE1
+#define FAN_CURVE_CPU (1 << 0)
+#define FAN_CURVE_GPU (1 << 1)
+
 extern bool fan_max;
 extern uint8_t fan_manual;
+// Curve being written, applied by fan_curve_commit()
+extern uint8_t fan_curve_pending[FAN_CURVE_BYTES];
+// Curve the fans run, read back over ACPI
+extern uint8_t fan_curve_applied[FAN_CURVE_BYTES];
 
 void fan_reset(void);
 
+int16_t fan_curve_commit(uint8_t target_mask) __reentrant;
 uint8_t fan_duty(const struct Fan *fan, int16_t temp) __reentrant;
 void fan_duty_set(uint8_t peci_fan_duty, uint8_t dgpu_fan_duty) __reentrant;
 uint8_t fan_heatup(const struct Fan *fan, uint8_t duty) __reentrant;

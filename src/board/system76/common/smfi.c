@@ -231,31 +231,23 @@ static enum Result cmd_security_set(void) {
 
 // Command structure: [fan] [temp0] [duty0] ... [temp3] [duty3]
 static enum Result cmd_fan_curve_set(void) {
-    struct FanPoint points[4];
-
-    for (int i = 0; i < 4; ++i) { // TODO hardcoded 4 points
-        points[i].temp = smfi_cmd[2 * i + SMFI_CMD_DATA + 1];
-        points[i].duty = smfi_cmd[2 * i + SMFI_CMD_DATA + 2] * 255 / 100;
-    }
-
-    if (!fan_points_are_valid(4, points))
-        return RES_ERR;
+    uint8_t mask;
 
     switch (smfi_cmd[SMFI_CMD_DATA]) {
     case 0:
-        if (peci_set_fan_curve(4, points) != 0)
-            return RES_ERR;
+        mask = FAN_CURVE_CPU;
         break;
 #if HAVE_DGPU
     case 1:
-        if (dgpu_set_fan_curve(4, points) != 0)
-            return RES_ERR;
+        mask = FAN_CURVE_GPU;
         break;
 #endif
     default:
         return RES_ERR;
     }
-    return RES_OK;
+
+    memcpy(fan_curve_pending, &smfi_cmd[SMFI_CMD_DATA + 1], FAN_CURVE_BYTES);
+    return fan_curve_commit(mask) ? RES_ERR : RES_OK;
 }
 
 static enum Result cmd_camera_enablement_set(void) {

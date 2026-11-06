@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include <board/dgpu.h>
 #include <board/fan.h>
+#include <board/peci.h>
 #include <common/debug.h>
 #include <common/macro.h>
 #include <ec/pwm.h>
+#include <string.h>
 
 #if SMOOTH_FANS != 0
 #define MAX_JUMP_UP ((MAX_FAN_SPEED - MIN_FAN_SPEED) / (uint8_t)SMOOTH_FANS_UP)
@@ -21,11 +24,49 @@ bool fan_max = false;
 uint8_t fan_manual = 0;
 uint8_t last_duty_dgpu = 0;
 uint8_t last_duty_peci = 0;
+uint8_t fan_curve_pending[FAN_CURVE_BYTES] = { 0 };
+uint8_t fan_curve_applied[FAN_CURVE_BYTES] = { 0 };
 
 void fan_reset(void) {
     // Do not manually set fans to maximum speed
     fan_max = false;
     fan_manual = 0;
+}
+
+int16_t fan_curve_commit(uint8_t target_mask) __reentrant {
+    struct FanPoint points[FAN_CURVE_POINTS];
+    int16_t res = 0;
+    uint8_t i;
+
+    for (i = 0; i < FAN_CURVE_POINTS; i++) {
+        uint8_t duty = fan_curve_pending[2 * i + 1];
+        if (duty > 100) {
+            res = -1;
+        }
+        points[i].temp = fan_curve_pending[2 * i];
+        points[i].duty = duty * 255 / 100;
+    }
+
+    if (res == 0 && !fan_points_are_valid(FAN_CURVE_POINTS, points)) {
+        res = -1;
+    }
+    if (res == 0 && (target_mask & FAN_CURVE_CPU)) {
+        res = peci_set_fan_curve(FAN_CURVE_POINTS, points);
+    }
+#if HAVE_DGPU
+    if (res == 0 && (target_mask & FAN_CURVE_GPU)) {
+        res = dgpu_set_fan_curve(FAN_CURVE_POINTS, points);
+    }
+#endif
+
+    if (res == 0) {
+        // apply pending to applied
+        memcpy(fan_curve_applied, fan_curve_pending, FAN_CURVE_BYTES);
+    } else {
+        // restore applied to pending
+        memcpy(fan_curve_pending, fan_curve_applied, FAN_CURVE_BYTES);
+    }
+    return res;
 }
 
 // Get duty cycle based on temperature, adapted from
