@@ -162,7 +162,7 @@ uint8_t acpi_read(uint8_t addr) {
             break;
 #endif // HAVE_LED_AIRPLANE_N
 
-        ACPI_8(0xDB, fan_manual ? 0b11 : 0b00);
+        ACPI_8(0xDB, fan_manual);
 
         // Power engine plug-in hook for S0ix
         case 0xE0:
@@ -198,12 +198,12 @@ void acpi_write(uint8_t addr, uint8_t data) {
 
     // fan duty
     case 0xCE:
-        if (fan_manual) {
+        if (fan_manual & FAN_MANUAL_1) {
             PWM_REG(CPU_FAN1) = data;
         }
         break;
     case 0xCF:
-        if (fan_manual) {
+        if (fan_manual & FAN_MANUAL_2) {
 #ifdef CPU_FAN2
             PWM_REG(CPU_FAN2) = data;
 #endif
@@ -214,7 +214,7 @@ void acpi_write(uint8_t addr, uint8_t data) {
         break;
 
     case 0xDB:
-        fan_manual = (bool)(data & BIT(0));
+        fan_manual = data & (FAN_MANUAL_1 | FAN_MANUAL_2);
         break;
 
 #if HAVE_LED_AIRPLANE_N

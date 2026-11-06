@@ -18,14 +18,14 @@
 #define PWM_REG(x) concat(DCR, x)
 
 bool fan_max = false;
-bool fan_manual = false;
+uint8_t fan_manual = 0;
 uint8_t last_duty_dgpu = 0;
 uint8_t last_duty_peci = 0;
 
 void fan_reset(void) {
     // Do not manually set fans to maximum speed
     fan_max = false;
-    fan_manual = false;
+    fan_manual = 0;
 }
 
 // Get duty cycle based on temperature, adapted from
@@ -68,9 +68,8 @@ uint8_t fan_duty(const struct Fan *fan, int16_t temp) __reentrant {
 }
 
 void fan_duty_set(uint8_t peci_fan_duty, uint8_t dgpu_fan_duty) __reentrant {
-    if (fan_manual) {
-        return;
-    }
+    bool fan1_man = !!(fan_manual & FAN_MANUAL_1);
+    bool fan2_man = !!(fan_manual & FAN_MANUAL_2);
 
 #if SYNC_FANS != 0
     peci_fan_duty = peci_fan_duty > dgpu_fan_duty ? peci_fan_duty : dgpu_fan_duty;
@@ -78,18 +77,27 @@ void fan_duty_set(uint8_t peci_fan_duty, uint8_t dgpu_fan_duty) __reentrant {
 #endif
 
     // set PECI fan duty
-    if (peci_fan_duty != PWM_REG(CPU_FAN1)) {
+    if (
+        (!fan1_man && peci_fan_duty != PWM_REG(CPU_FAN1))
+#ifdef CPU_FAN2
+        || (!fan2_man && peci_fan_duty != PWM_REG(CPU_FAN2))
+#endif
+    ) {
         TRACE("PECI fan_duty_raw=%d\n", peci_fan_duty);
         last_duty_peci = peci_fan_duty = fan_smooth(last_duty_peci, peci_fan_duty);
-        PWM_REG(CPU_FAN1) = fan_max ? MAX_FAN_SPEED : peci_fan_duty;
+        if (!fan1_man) {
+            PWM_REG(CPU_FAN1) = fan_max ? MAX_FAN_SPEED : peci_fan_duty;
+        }
 #ifdef CPU_FAN2
-        PWM_REG(CPU_FAN2) = fan_max ? MAX_FAN_SPEED : peci_fan_duty;
+        if (!fan2_man) {
+            PWM_REG(CPU_FAN2) = fan_max ? MAX_FAN_SPEED : peci_fan_duty;
+        }
 #endif
         TRACE("PECI fan_duty_smoothed=%d\n", peci_fan_duty);
     }
 
     // set dGPU fan duty
-    if (dgpu_fan_duty != PWM_REG(GPU_FAN1)) {
+    if (!fan2_man && dgpu_fan_duty != PWM_REG(GPU_FAN1)) {
         TRACE("DGPU fan_duty_raw=%d\n", dgpu_fan_duty);
         last_duty_dgpu = dgpu_fan_duty = fan_smooth(last_duty_dgpu, dgpu_fan_duty);
         PWM_REG(GPU_FAN1) = fan_max ? MAX_FAN_SPEED : dgpu_fan_duty;

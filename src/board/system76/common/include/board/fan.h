@@ -55,8 +55,13 @@ struct Fan {
     bool interpolate;
 };
 
+// Fans under manual control as in ACPI 0xDB
+// bit 0 is CPU_FAN1, bit 1 is CPU_FAN2 or GPU_FAN1
+#define FAN_MANUAL_1 (1 << 0)
+#define FAN_MANUAL_2 (1 << 1)
+
 extern bool fan_max;
-extern bool fan_manual;
+extern uint8_t fan_manual;
 
 void fan_reset(void);
 
