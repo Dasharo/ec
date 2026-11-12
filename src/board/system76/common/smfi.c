@@ -229,7 +229,7 @@ static enum Result cmd_security_set(void) {
 }
 #endif // CONFIG_SECURITY
 
-// Command structure: [fan] [temp0] [duty0] ... [temp3] [duty3]
+// Command structure: [fan] [count] [temp0] [duty0] ...
 static enum Result cmd_fan_curve_set(void) {
     uint8_t mask;
 
@@ -246,8 +246,46 @@ static enum Result cmd_fan_curve_set(void) {
         return RES_ERR;
     }
 
-    memcpy(fan_curve_pending, &smfi_cmd[SMFI_CMD_DATA + 1], FAN_CURVE_BYTES);
+    if (smfi_cmd[SMFI_CMD_DATA + 1] != FAN_CURVE_POINTS) {
+        return RES_ERR;
+    }
+
+    memcpy(fan_curve_pending, &smfi_cmd[SMFI_CMD_DATA + 2], FAN_CURVE_BYTES);
     return fan_curve_commit(mask) ? RES_ERR : RES_OK;
+}
+
+static enum Result cmd_fan_curve_get(void) {
+    const uint8_t *curve;
+
+    switch (smfi_cmd[SMFI_CMD_DATA]) {
+    case FAN_CURVE_APPLIED:
+        curve = fan_curve_applied;
+        break;
+    case FAN_CURVE_PENDING:
+        curve = fan_curve_pending;
+        break;
+    default:
+        return RES_ERR;
+    }
+
+    smfi_cmd[SMFI_CMD_DATA] = FAN_CURVE_POINTS; // first field is count
+    memcpy(&smfi_cmd[SMFI_CMD_DATA + 1], curve, FAN_CURVE_BYTES);
+    return RES_OK;
+}
+
+static enum Result cmd_fan_curve_pending_set(void) {
+    if (smfi_cmd[SMFI_CMD_DATA] != FAN_CURVE_POINTS) {
+        return RES_ERR; // valid count assert
+    }
+
+    memcpy(fan_curve_pending, &smfi_cmd[SMFI_CMD_DATA + 1], FAN_CURVE_BYTES);
+    return RES_OK;
+}
+
+static enum Result cmd_fan_curve_commit(void) {
+    uint8_t target_mask = smfi_cmd[SMFI_CMD_DATA] & (FAN_CURVE_CPU | FAN_CURVE_GPU);
+
+    return fan_curve_commit(target_mask) ? RES_ERR : RES_OK;
 }
 
 static enum Result cmd_camera_enablement_set(void) {
@@ -417,6 +455,15 @@ void smfi_event(void) {
             break;
         case CMD_FAN_CURVE_SET:
             smfi_cmd[SMFI_CMD_RES] = cmd_fan_curve_set();
+            break;
+        case CMD_FAN_CURVE_GET:
+            smfi_cmd[SMFI_CMD_RES] = cmd_fan_curve_get();
+            break;
+        case CMD_FAN_CURVE_PENDING_SET:
+            smfi_cmd[SMFI_CMD_RES] = cmd_fan_curve_pending_set();
+            break;
+        case CMD_FAN_CURVE_COMMIT:
+            smfi_cmd[SMFI_CMD_RES] = cmd_fan_curve_commit();
             break;
         case CMD_CAMERA_ENABLEMENT_SET:
             smfi_cmd[SMFI_CMD_RES] = cmd_camera_enablement_set();

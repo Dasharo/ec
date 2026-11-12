@@ -62,6 +62,9 @@ enum Command {
     CMD_OPTION_SET = 26,
     // Drive the flash descriptor security override strap (ME_WE) for one boot
     CMD_ME_OVERRIDE_SET = 27,
+    CMD_FAN_CURVE_GET = 28,
+    CMD_FAN_CURVE_PENDING_SET = 29,
+    CMD_FAN_CURVE_COMMIT = 30,
     //TODO
 };
 
