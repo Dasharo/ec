@@ -43,6 +43,7 @@ EC_GIT_REV="$(git rev-parse --short HEAD)"
 EC_BUILD_DIR="build/${EC_BOARD_VENDOR}/${EC_BOARD_MODEL}/${EC_GIT_DATE}_${EC_GIT_REV:0:7}"
 EC_ROM="${EC_BUILD_DIR}/ec.rom"
 EC_ARTIFACT="${EC_BOARD_VENDOR}_${EC_BOARD_MODEL}_ec.rom"
+DOCKER_UID="${UID:-$(id -u)}"
 
 # For already released boards, keep the original names (already present in the
 # released firmwares) to avoid the necessity of force-flashing during EC
@@ -70,7 +71,7 @@ if [ "$EC_BOARD_VENDOR" = "novacustom" ] ; then
   esac
 fi
 
-docker run --rm -v "$PWD":"$PWD" -w "$PWD" -u "$(id -u)" \
+docker run --rm -v "$PWD":"$PWD" -w "$PWD" -u "$DOCKER_UID" \
   ghcr.io/dasharo/ec-sdk:main make BOARD="${EC_BOARD_VENDOR}/${EC_BOARD_MODEL}"
 errorCheck "Failed to build EC firmware"
 
