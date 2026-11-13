@@ -134,13 +134,13 @@ static enum Result cmd_fan_get(void) {
     case 0:
         // Get duty of fan 0
         smfi_cmd[SMFI_CMD_DATA + 1] = PWM_REG(CPU_FAN1);
-        // TODO handle dual CPU fans
         return RES_OK;
+#if FAN2_SUPPORTED
     case 1:
         // Get duty of fan 1
-        //TODO: only allow on platforms like addw2
-        smfi_cmd[SMFI_CMD_DATA + 1] = PWM_REG(GPU_FAN1);
+        smfi_cmd[SMFI_CMD_DATA + 1] = PWM_REG(FAN2_PWM);
         return RES_OK;
+#endif
     }
 
     // Failed if fan not found
@@ -152,16 +152,13 @@ static enum Result cmd_fan_set(void) {
     case 0:
         // Set duty cycle of fan 0
         PWM_REG(CPU_FAN1) = smfi_cmd[SMFI_CMD_DATA + 1];
-#ifdef CPU_FAN2
-        // TODO handle CPU fan 2 separately
-        PWM_REG(CPU_FAN2) = smfi_cmd[SMFI_CMD_DATA + 1];
-#endif
         return RES_OK;
+#if FAN2_SUPPORTED
     case 1:
         // Set duty cycle of fan 1
-        //TODO: only allow on platforms like addw2
-        PWM_REG(GPU_FAN1) = smfi_cmd[SMFI_CMD_DATA + 1];
+        PWM_REG(FAN2_PWM) = smfi_cmd[SMFI_CMD_DATA + 1];
         return RES_OK;
+#endif
     }
 
     // Failed if fan not found
@@ -231,18 +228,9 @@ static enum Result cmd_security_set(void) {
 
 // Command structure: [fan] [count] [temp0] [duty0] ...
 static enum Result cmd_fan_curve_set(void) {
-    uint8_t mask;
+    uint8_t fan = smfi_cmd[SMFI_CMD_DATA];
 
-    switch (smfi_cmd[SMFI_CMD_DATA]) {
-    case 0:
-        mask = FAN_CURVE_CPU;
-        break;
-#if HAVE_DGPU
-    case 1:
-        mask = FAN_CURVE_GPU;
-        break;
-#endif
-    default:
+    if (!fan_curve_is_present(fan)) {
         return RES_ERR;
     }
 
@@ -250,42 +238,51 @@ static enum Result cmd_fan_curve_set(void) {
         return RES_ERR;
     }
 
-    memcpy(fan_curve_pending, &smfi_cmd[SMFI_CMD_DATA + 2], FAN_CURVE_BYTES);
-    return fan_curve_commit(mask) ? RES_ERR : RES_OK;
+    memcpy(fan_curve_pending[fan], &smfi_cmd[SMFI_CMD_DATA + 2], FAN_CURVE_BYTES);
+    return fan_curve_commit(fan) ? RES_ERR : RES_OK;
 }
 
 static enum Result cmd_fan_curve_get(void) {
+    uint8_t fan = smfi_cmd[SMFI_CMD_DATA];
     const uint8_t *curve;
 
-    switch (smfi_cmd[SMFI_CMD_DATA]) {
+    if (!fan_curve_is_present(fan)) {
+        return RES_ERR;
+    }
+
+    switch (smfi_cmd[SMFI_CMD_DATA + 1]) {
     case FAN_CURVE_APPLIED:
-        curve = fan_curve_applied;
+        curve = fan_curve_applied[fan];
         break;
     case FAN_CURVE_PENDING:
-        curve = fan_curve_pending;
+        curve = fan_curve_pending[fan];
         break;
     default:
         return RES_ERR;
     }
 
-    smfi_cmd[SMFI_CMD_DATA] = FAN_CURVE_POINTS; // first field is count
-    memcpy(&smfi_cmd[SMFI_CMD_DATA + 1], curve, FAN_CURVE_BYTES);
+    smfi_cmd[SMFI_CMD_DATA + 1] = FAN_CURVE_POINTS;
+    memcpy(&smfi_cmd[SMFI_CMD_DATA + 2], curve, FAN_CURVE_BYTES);
     return RES_OK;
 }
 
 static enum Result cmd_fan_curve_pending_set(void) {
-    if (smfi_cmd[SMFI_CMD_DATA] != FAN_CURVE_POINTS) {
+    uint8_t fan = smfi_cmd[SMFI_CMD_DATA];
+
+    if (!fan_curve_is_present(fan)) {
+        return RES_ERR;
+    }
+
+    if (smfi_cmd[SMFI_CMD_DATA + 1] != FAN_CURVE_POINTS) {
         return RES_ERR; // valid count assert
     }
 
-    memcpy(fan_curve_pending, &smfi_cmd[SMFI_CMD_DATA + 1], FAN_CURVE_BYTES);
+    memcpy(fan_curve_pending[fan], &smfi_cmd[SMFI_CMD_DATA + 2], FAN_CURVE_BYTES);
     return RES_OK;
 }
 
 static enum Result cmd_fan_curve_commit(void) {
-    uint8_t target_mask = smfi_cmd[SMFI_CMD_DATA] & (FAN_CURVE_CPU | FAN_CURVE_GPU);
-
-    return fan_curve_commit(target_mask) ? RES_ERR : RES_OK;
+    return fan_curve_commit(smfi_cmd[SMFI_CMD_DATA]) ? RES_ERR : RES_OK;
 }
 
 static enum Result cmd_camera_enablement_set(void) {

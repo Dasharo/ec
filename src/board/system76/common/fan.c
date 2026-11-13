@@ -20,12 +20,14 @@
 
 #define PWM_REG(x) concat(DCR, x)
 
+static bool fan_curves_match = true;
+
 bool fan_max = false;
 uint8_t fan_manual = 0;
-uint8_t last_duty_dgpu = 0;
-uint8_t last_duty_peci = 0;
-uint8_t fan_curve_pending[FAN_CURVE_BYTES] = { 0 };
-uint8_t fan_curve_applied[FAN_CURVE_BYTES] = { 0 };
+uint8_t last_duty_fan1 = 0;
+uint8_t last_duty_fan2 = 0;
+uint8_t fan_curve_pending[FAN_CURVE_COUNT][FAN_CURVE_BYTES] = { { 0 } };
+uint8_t fan_curve_applied[FAN_CURVE_COUNT][FAN_CURVE_BYTES] = { { 0 } };
 
 void fan_reset(void) {
     // Do not manually set fans to maximum speed
@@ -33,38 +35,63 @@ void fan_reset(void) {
     fan_manual = 0;
 }
 
-int16_t fan_curve_commit(uint8_t target_mask) __reentrant {
+bool fan_curve_is_present(uint8_t fan) __reentrant {
+    switch (fan) {
+    case FAN_CURVE_FAN1:
+        return true;
+#if FAN2_SUPPORTED
+    case FAN_CURVE_FAN2:
+        return true;
+#endif
+    }
+    return false;
+}
+
+int16_t fan_curve_commit(uint8_t fan) __reentrant {
     struct FanPoint points[FAN_CURVE_POINTS];
     int16_t res = 0;
     uint8_t i;
 
+    if (!fan_curve_is_present(fan)) {
+        return -1;
+    }
+
     for (i = 0; i < FAN_CURVE_POINTS; i++) {
-        uint8_t duty = fan_curve_pending[2 * i + 1];
+        uint8_t duty = fan_curve_pending[fan][2 * i + 1];
         if (duty > 100) {
             res = -1;
         }
-        points[i].temp = fan_curve_pending[2 * i];
+        points[i].temp = fan_curve_pending[fan][2 * i];
         points[i].duty = duty * 255 / 100;
     }
 
     if (res == 0 && !fan_points_are_valid(FAN_CURVE_POINTS, points)) {
         res = -1;
     }
-    if (res == 0 && (target_mask & FAN_CURVE_CPU)) {
+    if (res == 0 && fan == FAN_CURVE_FAN1) {
         res = peci_set_fan_curve(FAN_CURVE_POINTS, points);
     }
 #if HAVE_DGPU
-    if (res == 0 && (target_mask & FAN_CURVE_GPU)) {
+    if (res == 0 && fan == FAN_CURVE_FAN2) {
         res = dgpu_set_fan_curve(FAN_CURVE_POINTS, points);
+    }
+#elif defined(CPU_FAN2)
+    if (res == 0 && fan == FAN_CURVE_FAN2) {
+        res = peci_set_fan2_curve(FAN_CURVE_POINTS, points);
     }
 #endif
 
     if (res == 0) {
         // apply pending to applied
-        memcpy(fan_curve_applied, fan_curve_pending, FAN_CURVE_BYTES);
+        memcpy(fan_curve_applied[fan], fan_curve_pending[fan], FAN_CURVE_BYTES);
+        fan_curves_match = memcmp(
+                               fan_curve_applied[FAN_CURVE_FAN1],
+                               fan_curve_applied[FAN_CURVE_FAN2],
+                               FAN_CURVE_BYTES
+                           ) == 0;
     } else {
         // restore applied to pending
-        memcpy(fan_curve_pending, fan_curve_applied, FAN_CURVE_BYTES);
+        memcpy(fan_curve_pending[fan], fan_curve_applied[fan], FAN_CURVE_BYTES);
     }
     return res;
 }
@@ -108,42 +135,38 @@ uint8_t fan_duty(const struct Fan *fan, int16_t temp) __reentrant {
     return MAX_FAN_SPEED;
 }
 
-void fan_duty_set(uint8_t peci_fan_duty, uint8_t dgpu_fan_duty) __reentrant {
+void fan_duty_set(uint8_t fan1_duty, uint8_t fan2_duty) __reentrant {
     bool fan1_man = !!(fan_manual & FAN_MANUAL_1);
+#if FAN2_SUPPORTED
     bool fan2_man = !!(fan_manual & FAN_MANUAL_2);
 
 #if SYNC_FANS != 0
-    peci_fan_duty = peci_fan_duty > dgpu_fan_duty ? peci_fan_duty : dgpu_fan_duty;
-    dgpu_fan_duty = peci_fan_duty > dgpu_fan_duty ? peci_fan_duty : dgpu_fan_duty;
+    if (fan_curves_match && !fan1_man && !fan2_man) {
+        fan1_duty = fan1_duty > fan2_duty ? fan1_duty : fan2_duty;
+        fan2_duty = fan1_duty;
+    }
+#endif
+#else
+    fan2_duty = fan2_duty; // unused if fan 2 is not supported
 #endif
 
-    // set PECI fan duty
-    if (
-        (!fan1_man && peci_fan_duty != PWM_REG(CPU_FAN1))
-#ifdef CPU_FAN2
-        || (!fan2_man && peci_fan_duty != PWM_REG(CPU_FAN2))
-#endif
-    ) {
-        TRACE("PECI fan_duty_raw=%d\n", peci_fan_duty);
-        last_duty_peci = peci_fan_duty = fan_smooth(last_duty_peci, peci_fan_duty);
-        if (!fan1_man) {
-            PWM_REG(CPU_FAN1) = fan_max ? MAX_FAN_SPEED : peci_fan_duty;
-        }
-#ifdef CPU_FAN2
-        if (!fan2_man) {
-            PWM_REG(CPU_FAN2) = fan_max ? MAX_FAN_SPEED : peci_fan_duty;
-        }
-#endif
-        TRACE("PECI fan_duty_smoothed=%d\n", peci_fan_duty);
+    // set fan 1 duty
+    if (!fan1_man && fan1_duty != PWM_REG(CPU_FAN1)) {
+        TRACE("FAN1 fan_duty_raw=%d\n", fan1_duty);
+        last_duty_fan1 = fan1_duty = fan_smooth(last_duty_fan1, fan1_duty);
+        PWM_REG(CPU_FAN1) = fan_max ? MAX_FAN_SPEED : fan1_duty;
+        TRACE("FAN1 fan_duty_smoothed=%d\n", fan1_duty);
     }
 
-    // set dGPU fan duty
-    if (!fan2_man && dgpu_fan_duty != PWM_REG(GPU_FAN1)) {
-        TRACE("DGPU fan_duty_raw=%d\n", dgpu_fan_duty);
-        last_duty_dgpu = dgpu_fan_duty = fan_smooth(last_duty_dgpu, dgpu_fan_duty);
-        PWM_REG(GPU_FAN1) = fan_max ? MAX_FAN_SPEED : dgpu_fan_duty;
-        TRACE("DGPU fan_duty_smoothed=%d\n", dgpu_fan_duty);
+#if FAN2_SUPPORTED
+    // set fan 2 duty
+    if (!fan2_man && fan2_duty != PWM_REG(FAN2_PWM)) {
+        TRACE("FAN2 fan_duty_raw=%d\n", fan2_duty);
+        last_duty_fan2 = fan2_duty = fan_smooth(last_duty_fan2, fan2_duty);
+        PWM_REG(FAN2_PWM) = fan_max ? MAX_FAN_SPEED : fan2_duty;
+        TRACE("FAN2 fan_duty_smoothed=%d\n", fan2_duty);
     }
+#endif
 }
 
 uint8_t fan_heatup(const struct Fan *fan, uint8_t duty) __reentrant {

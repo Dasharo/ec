@@ -26,11 +26,8 @@ void pwm_init(void) {
 
     // Turn off CPU fan (temperature control in peci_get_fan_duty)
     PWM_REG(CPU_FAN1) = 0;
-#ifdef CPU_FAN2
-    PWM_REG(CPU_FAN2) = 0;
-#endif
-#if HAVE_DGPU
-    PWM_REG(GPU_FAN1) = 0;
+#if FAN2_SUPPORTED
+    PWM_REG(FAN2_PWM) = 0;
 #endif
 
 #if CONFIG_EC_ITE_IT5570E

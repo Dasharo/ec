@@ -136,7 +136,13 @@ void main(void) {
                 last_time_fan = time;
 
                 // Update fan speeds
-                fan_duty_set(peci_get_fan_duty(), dgpu_get_fan_duty());
+                uint8_t fan1_duty = peci_get_fan_duty();
+#ifdef CPU_FAN2
+                uint8_t fan2_duty = peci_get_fan2_duty();
+#else
+                uint8_t fan2_duty = dgpu_get_fan_duty();
+#endif
+                fan_duty_set(fan1_duty, fan2_duty);
             }
 
             // Only run the following once per interval

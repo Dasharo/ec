@@ -33,5 +33,9 @@ int16_t peci_set_fan_curve(uint8_t count, struct FanPoint *points) __reentrant;
 int16_t peci_wr_pkg_config(uint8_t index, uint16_t param, uint32_t data) __reentrant;
 int16_t peci_rd_pkg_config(uint8_t index, uint16_t param, uint32_t *value) __reentrant;
 uint8_t peci_get_fan_duty(void);
+#ifdef CPU_FAN2
+int16_t peci_set_fan2_curve(uint8_t count, struct FanPoint *points) __reentrant;
+uint8_t peci_get_fan2_duty(void);
+#endif
 
 #endif // _BOARD_PECI_H

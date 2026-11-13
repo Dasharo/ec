@@ -29,6 +29,12 @@ static uint8_t FAN_HEATUP[BOARD_HEATUP] = { 0 };
 
 static uint8_t FAN_COOLDOWN[BOARD_COOLDOWN] = { 0 };
 
+#ifdef CPU_FAN2
+static uint8_t FAN2_HEATUP[BOARD_HEATUP] = { 0 };
+static uint8_t FAN2_COOLDOWN[BOARD_COOLDOWN] = { 0 };
+#endif
+
+static bool peci_temp_valid = false;
 bool peci_on = false;
 int16_t peci_temp = 0;
 uint8_t t_junction = 100;
@@ -51,6 +57,19 @@ static struct FanPoint FAN_POINTS[] = {
 #endif
 };
 
+#ifdef CPU_FAN2
+static struct FanPoint FAN2_POINTS[] = {
+#ifdef BOARD_FAN_POINTS
+    BOARD_FAN_POINTS
+#else
+    FAN_POINT(0, 25),
+    FAN_POINT(65, 30),
+    FAN_POINT(75, 35),
+    FAN_POINT(100, 100)
+#endif
+};
+#endif
+
 static struct Fan FAN = {
     .points = FAN_POINTS,
     .points_size = ARRAY_SIZE(FAN_POINTS),
@@ -61,21 +80,43 @@ static struct Fan FAN = {
     .interpolate = SMOOTH_FANS != 0,
 };
 
-int16_t peci_set_fan_curve(uint8_t count, struct FanPoint *points) __reentrant {
+#ifdef CPU_FAN2
+static struct Fan CPU_FAN2_CURVE = {
+    .points = FAN2_POINTS,
+    .points_size = ARRAY_SIZE(FAN2_POINTS),
+    .heatup = FAN2_HEATUP,
+    .heatup_size = ARRAY_SIZE(FAN2_HEATUP),
+    .cooldown = FAN2_COOLDOWN,
+    .cooldown_size = ARRAY_SIZE(FAN2_COOLDOWN),
+    .interpolate = SMOOTH_FANS != 0,
+};
+#endif
+
+static int16_t set_fan_curve(struct Fan *fan, uint8_t count, struct FanPoint *points) __reentrant {
     int i;
-    if (count != FAN.points_size) {
-        TRACE("PECI: Incorrect number of fan points: %d, expected %d\n", count, FAN.points_size);
+    if (count != fan->points_size) {
+        TRACE("PECI: Incorrect number of fan points: %d, expected %d\n", count, fan->points_size);
         return -1;
     }
 
     for (i = 0; i < count; ++i) {
         TRACE("PECI: fan curve t%d: %d, d%d: %d\n", i, points[i].temp, i, points[i].duty);
-        FAN.points[i].temp = points[i].temp;
-        FAN.points[i].duty = points[i].duty;
+        fan->points[i].temp = points[i].temp;
+        fan->points[i].duty = points[i].duty;
     }
 
     return 0;
 }
+
+int16_t peci_set_fan_curve(uint8_t count, struct FanPoint *points) __reentrant {
+    return set_fan_curve(&FAN, count, points);
+}
+
+#ifdef CPU_FAN2
+int16_t peci_set_fan2_curve(uint8_t count, struct FanPoint *points) __reentrant {
+    return set_fan_curve(&CPU_FAN2_CURVE, count, points);
+}
+#endif
 
 // Returns true if peci is available
 bool peci_available(void) {
@@ -483,24 +524,19 @@ int16_t peci_rd_pkg_config(uint8_t index, uint16_t param, uint32_t *value) __ree
 #endif // CONFIG_PECI_OVER_ESPI
 
 // PECI information can be found here: https://www.intel.com/content/dam/www/public/us/en/documents/design-guides/core-i7-lga-2011-guide.pdf
-uint8_t peci_get_fan_duty(void) {
+static uint8_t get_fan_duty(struct Fan *fan) __reentrant {
     uint8_t duty;
 
-    peci_on = peci_available();
     if (peci_on) {
-        int16_t peci_offset = 0;
-        if (peci_get_temp(&peci_offset)) {
+        if (peci_temp_valid) {
             // Use result if finished successfully
-            peci_temp = PECI_TEMP(t_junction) + (peci_offset >> 6);
-            duty = fan_duty(&FAN, peci_temp);
+            duty = fan_duty(fan, peci_temp);
         } else {
             // Default to 50% if there is an error
-            peci_temp = 0;
             duty = PWM_DUTY(50);
         }
     } else {
         // Turn fan off if not in S0 state
-        peci_temp = 0;
         duty = PWM_DUTY(0);
     }
 
@@ -509,11 +545,31 @@ uint8_t peci_get_fan_duty(void) {
         duty = PWM_DUTY(100);
     } else {
         // Apply heatup and cooldown filters to duty
-        duty = fan_heatup(&FAN, duty);
-        duty = fan_cooldown(&FAN, duty);
+        duty = fan_heatup(fan, duty);
+        duty = fan_cooldown(fan, duty);
     }
 
     TRACE("PECI temp=%d\n", peci_temp);
     TRACE("fan duty set to=%d\n", duty);
     return duty;
 }
+
+uint8_t peci_get_fan_duty(void) {
+    int16_t peci_offset = 0;
+
+    peci_on = peci_available();
+    peci_temp_valid = peci_on && peci_get_temp(&peci_offset);
+    if (peci_temp_valid) {
+        peci_temp = PECI_TEMP(t_junction) + (peci_offset >> 6);
+    } else {
+        peci_temp = 0;
+    }
+
+    return get_fan_duty(&FAN);
+}
+
+#ifdef CPU_FAN2
+uint8_t peci_get_fan2_duty(void) {
+    return get_fan_duty(&CPU_FAN2_CURVE);
+}
+#endif
