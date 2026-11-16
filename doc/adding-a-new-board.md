@@ -9,6 +9,14 @@
   voltage). Convert this from volts to millivolts.
 - `CHARGER_INPUT_CURRENT`: On the charger, look for DC output. Convert the
   current from amps to milliamps.
+- `BATTERY_CHARGE_TEMP_MAX` / `BATTERY_CHARGE_TEMP_RESUME` (optional): Battery
+  temperature, in 0.1 K, at which charging is inhibited and allowed again.
+  Defaults to 45 °C / 40 °C. On the battery, look for the charge temperature
+  range (充电温度) and keep the maximum at or below its upper bound. Use
+  `BATTERY_TEMP_DK(c)` to convert from °C. The EC reads the pack's
+  `Temperature()` (SBS 0x08) and also honors the `OVER_TEMP_ALARM` bit of
+  `BatteryStatus()`. Check the `Battery:` section of the EC debug log on AC
+  plug-in to confirm that the pack reports a real temperature.
 
 #### Example
 

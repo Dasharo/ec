@@ -273,6 +273,7 @@ void battery_debug(void) {
     command(Current, BATTERY_ADDRESS, 0x0A);
     command(Charge, BATTERY_ADDRESS, 0x0D);
     command(Status, BATTERY_ADDRESS, 0x16);
+    DEBUG("  TempInhibit: %d\n", (int)battery_charge_temp_inhibited());
 
     DEBUG("Charger (bq24780s):\n");
     command(ChargeOption0, CHARGER_ADDRESS, REG_CHARGE_OPTION_0);

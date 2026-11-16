@@ -19,6 +19,7 @@
 // Smart Battery BatteryStatus() flags
 #define BATTERY_FULLY_CHARGED BIT(5)
 #define BATTERY_INITIALIZED BIT(7)
+#define BATTERY_OVER_TEMP_ALARM BIT(12)
 
 // Discharge current below which a fully charged battery on AC is not
 // reported as discharging. Some charger, battery and adapter combinations
@@ -32,6 +33,29 @@
 // self-discharges this many percent below the end threshold.
 #ifndef BATTERY_RECHARGE_HYSTERESIS
 #define BATTERY_RECHARGE_HYSTERESIS 5
+#endif
+
+// Battery temperature charging gate, in 0.1 K as returned by Smart Battery
+// Temperature(). Charging is inhibited at or above BATTERY_CHARGE_TEMP_MAX and
+// may resume once the temperature drops to or below BATTERY_CHARGE_TEMP_RESUME.
+// The defaults (45 C / 40 C) match the upper bound of the 0-45 C charge range
+// typical of Li-ion laptop packs, below the pack BMS's own cut-off, so the EC
+// acts first. Boards whose pack has a different rated range should override.
+#define BATTERY_TEMP_DK(c) (2732 + (c) * 10)
+#ifndef BATTERY_CHARGE_TEMP_MAX
+#define BATTERY_CHARGE_TEMP_MAX BATTERY_TEMP_DK(45)
+#endif
+#ifndef BATTERY_CHARGE_TEMP_RESUME
+#define BATTERY_CHARGE_TEMP_RESUME BATTERY_TEMP_DK(40)
+#endif
+// Temperature() readings outside this range are treated as invalid, e.g. a
+// failed read (0) or a pack without a thermistor wired to the gauge. The gate
+// then falls back to the pack's BatteryStatus() OVER_TEMP_ALARM bit.
+#define BATTERY_TEMP_VALID_MIN BATTERY_TEMP_DK(-40)
+#define BATTERY_TEMP_VALID_MAX BATTERY_TEMP_DK(100)
+
+#if BATTERY_CHARGE_TEMP_RESUME >= BATTERY_CHARGE_TEMP_MAX
+#error "BATTERY_CHARGE_TEMP_RESUME must be below BATTERY_CHARGE_TEMP_MAX"
 #endif
 
 #ifndef AC_ADAPTER_VOLTAGE
@@ -67,6 +91,7 @@ uint8_t battery_get_end_threshold(void);
 bool battery_set_end_threshold(uint8_t value);
 
 bool battery_requests_charge(void);
+bool battery_charge_temp_inhibited(void);
 uint16_t battery_charge_current_ma(void);
 uint16_t battery_charge_voltage_mv(void);
 

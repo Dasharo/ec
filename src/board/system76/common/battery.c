@@ -51,6 +51,62 @@ bool battery_requests_charge(void) {
     return battery_info.charging_current && battery_info.charging_voltage;
 }
 
+// Charging is inhibited because the battery is too hot
+static bool temp_inhibit = false;
+
+/**
+ * Whether charging is inhibited due to high battery temperature.
+ */
+bool battery_charge_temp_inhibited(void) {
+    return temp_inhibit;
+}
+
+static bool battery_temp_valid(void) {
+    return battery_info.temp >= BATTERY_TEMP_VALID_MIN &&
+        battery_info.temp <= BATTERY_TEMP_VALID_MAX;
+}
+
+/**
+ * Update the battery temperature charging gate from the latest battery data.
+ *
+ * Charging is inhibited when Temperature() (SBS 0x08) reaches
+ * BATTERY_CHARGE_TEMP_MAX, or when the pack sets OVER_TEMP_ALARM in
+ * BatteryStatus() (SBS 0x16). It is allowed again only once the temperature
+ * is at or below BATTERY_CHARGE_TEMP_RESUME, the alarm is cleared, and, per
+ * Smart Battery Data Specification rev 1.1, the battery requests charge again
+ * through non-zero ChargingCurrent() and ChargingVoltage().
+ */
+static void battery_temp_gate_update(void) {
+    static bool temp_valid_last = true;
+    bool temp_valid = battery_temp_valid();
+    bool alarm = (battery_info.status & BATTERY_OVER_TEMP_ALARM) != 0;
+
+    if (temp_valid != temp_valid_last) {
+        if (temp_valid)
+            DEBUG("Battery temperature valid: %d dK\n", battery_info.temp);
+        else
+            DEBUG("Battery temperature invalid: %d dK, using alarm only\n", battery_info.temp);
+        temp_valid_last = temp_valid;
+    }
+
+    if (!temp_inhibit) {
+        if (alarm || (temp_valid && battery_info.temp >= BATTERY_CHARGE_TEMP_MAX)) {
+            DEBUG(
+                "Battery over temperature: %d dK, alarm %d, charging inhibited\n",
+                battery_info.temp,
+                (int)alarm
+            );
+            temp_inhibit = true;
+        }
+    } else {
+        bool cooled = !temp_valid || battery_info.temp <= BATTERY_CHARGE_TEMP_RESUME;
+        if (!alarm && cooled && battery_requests_charge()) {
+            DEBUG("Battery temperature normal: %d dK, charging allowed\n", battery_info.temp);
+            temp_inhibit = false;
+        }
+    }
+}
+
 /**
  * Charge current to program, as requested by the battery but never exceeding
  * the board limit.
@@ -99,6 +155,11 @@ int16_t battery_charger_configure(void) {
             should_charge = true;
     }
 
+    // Never charge a hot battery, regardless of the charging thresholds. The
+    // threshold state is kept so charging resumes once the battery cools down.
+    if (temp_inhibit)
+        return battery_charger_disable();
+
     if (should_charge) {
         stopped_at_end = false;
         return battery_charger_enable();
@@ -132,7 +193,8 @@ void battery_event(void) {
 
 #undef command
 
-    TRACE("BAT %d mV %d mA\n", battery_info.voltage, battery_info.current);
+    TRACE("BAT %d mV %d mA %d dK\n", battery_info.voltage, battery_info.current, battery_info.temp);
 
+    battery_temp_gate_update();
     battery_charger_event();
 }

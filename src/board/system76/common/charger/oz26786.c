@@ -267,6 +267,7 @@ void battery_debug(void) {
     command(Current, BATTERY_ADDRESS, 0x0A);
     command(Charge, BATTERY_ADDRESS, 0x0D);
     command(Status, BATTERY_ADDRESS, 0x16);
+    DEBUG("  TempInhibit: %d\n", (int)battery_charge_temp_inhibited());
 
     DEBUG("Charger (oz26786):\n");
     command(ChargeCurrent, CHARGER_ADDRESS, REG_CHARGE_CURRENT);
