@@ -48,11 +48,13 @@
 #ifndef BATTERY_CHARGE_TEMP_RESUME
 #define BATTERY_CHARGE_TEMP_RESUME BATTERY_TEMP_DK(40)
 #endif
-// Temperature() readings outside this range are treated as invalid, e.g. a
-// failed read (0) or a pack without a thermistor wired to the gauge. The gate
-// then falls back to the pack's BatteryStatus() OVER_TEMP_ALARM bit.
+// Temperature() readings below this are treated as no reading, e.g. a failed
+// read (0), an open thermistor or a pack without a thermistor wired to the
+// gauge. None of these indicate a hot pack, so the gate then falls back to the
+// pack's BatteryStatus() OVER_TEMP_ALARM bit. There is no upper bound: any
+// reading at or above BATTERY_CHARGE_TEMP_MAX, however implausible (e.g. a
+// shorted thermistor), inhibits charging.
 #define BATTERY_TEMP_VALID_MIN BATTERY_TEMP_DK(-40)
-#define BATTERY_TEMP_VALID_MAX BATTERY_TEMP_DK(100)
 
 #if BATTERY_CHARGE_TEMP_RESUME >= BATTERY_CHARGE_TEMP_MAX
 #error "BATTERY_CHARGE_TEMP_RESUME must be below BATTERY_CHARGE_TEMP_MAX"

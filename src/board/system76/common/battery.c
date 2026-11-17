@@ -62,8 +62,7 @@ bool battery_charge_temp_inhibited(void) {
 }
 
 static bool battery_temp_valid(void) {
-    return battery_info.temp >= BATTERY_TEMP_VALID_MIN &&
-        battery_info.temp <= BATTERY_TEMP_VALID_MAX;
+    return battery_info.temp >= BATTERY_TEMP_VALID_MIN;
 }
 
 /**
@@ -75,6 +74,10 @@ static bool battery_temp_valid(void) {
  * is at or below BATTERY_CHARGE_TEMP_RESUME, the alarm is cleared, and, per
  * Smart Battery Data Specification rev 1.1, the battery requests charge again
  * through non-zero ChargingCurrent() and ChargingVoltage().
+ *
+ * A reading below BATTERY_TEMP_VALID_MIN is treated as no reading and only the
+ * alarm bit is used. Gate state changes are logged at WARN level so they show
+ * up in release builds.
  */
 static void battery_temp_gate_update(void) {
     static bool temp_valid_last = true;
@@ -83,15 +86,15 @@ static void battery_temp_gate_update(void) {
 
     if (temp_valid != temp_valid_last) {
         if (temp_valid)
-            DEBUG("Battery temperature valid: %d dK\n", battery_info.temp);
+            WARN("Battery temperature valid: %d dK\n", battery_info.temp);
         else
-            DEBUG("Battery temperature invalid: %d dK, using alarm only\n", battery_info.temp);
+            WARN("Battery temperature invalid: %d dK, using alarm only\n", battery_info.temp);
         temp_valid_last = temp_valid;
     }
 
     if (!temp_inhibit) {
         if (alarm || (temp_valid && battery_info.temp >= BATTERY_CHARGE_TEMP_MAX)) {
-            DEBUG(
+            WARN(
                 "Battery over temperature: %d dK, alarm %d, charging inhibited\n",
                 battery_info.temp,
                 (int)alarm
@@ -101,7 +104,7 @@ static void battery_temp_gate_update(void) {
     } else {
         bool cooled = !temp_valid || battery_info.temp <= BATTERY_CHARGE_TEMP_RESUME;
         if (!alarm && cooled && battery_requests_charge()) {
-            DEBUG("Battery temperature normal: %d dK, charging allowed\n", battery_info.temp);
+            WARN("Battery temperature normal: %d dK, charging allowed\n", battery_info.temp);
             temp_inhibit = false;
         }
     }

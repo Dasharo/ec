@@ -15,8 +15,10 @@
   range (充电温度) and keep the maximum at or below its upper bound. Use
   `BATTERY_TEMP_DK(c)` to convert from °C. The EC reads the pack's
   `Temperature()` (SBS 0x08) and also honors the `OVER_TEMP_ALARM` bit of
-  `BatteryStatus()`. Check the `Battery:` section of the EC debug log on AC
-  plug-in to confirm that the pack reports a real temperature.
+  `BatteryStatus()`. Any reading at or above the maximum inhibits charging,
+  however implausible; readings below -40 °C are treated as no sensor and
+  only the alarm bit is used. Check the `Battery:` section of the EC debug
+  log on AC plug-in to confirm that the pack reports a real temperature.
 
 #### Example
 
