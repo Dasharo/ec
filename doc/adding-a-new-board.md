@@ -19,6 +19,12 @@
   however implausible; readings below -40 °C are treated as no sensor and
   only the alarm bit is used. Check the `Battery:` section of the EC debug
   log on AC plug-in to confirm that the pack reports a real temperature.
+- `BATTERY_TAPER_START` / `BATTERY_TAPER_MIN_CURRENT` (optional): Above
+  `BATTERY_TAPER_START` percent state of charge, the charge current limit
+  drops linearly from `CHARGER_CHARGE_CURRENT` to `BATTERY_TAPER_MIN_CURRENT`
+  (mA) at 100%. Defaults to 80% / 512 mA. Keep the minimum well above the
+  pack's charge termination current (typically C/20 to C/10). Set
+  `BATTERY_TAPER_START` to 100 to disable.
 
 #### Example
 

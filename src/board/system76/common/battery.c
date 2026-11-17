@@ -111,11 +111,31 @@ static void battery_temp_gate_update(void) {
 }
 
 /**
+ * Charge current limit for the current state of charge. Full board limit up to
+ * BATTERY_TAPER_START, then dropping linearly to BATTERY_TAPER_MIN_CURRENT at
+ * 100%.
+ */
+static uint16_t battery_taper_current_ma(void) {
+#if BATTERY_TAPER_START < 100 && BATTERY_TAPER_MIN_CURRENT < CHARGER_CHARGE_CURRENT
+    uint16_t charge = MIN(battery_info.charge, 100);
+
+    if (charge <= BATTERY_TAPER_START)
+        return CHARGER_CHARGE_CURRENT;
+
+    return CHARGER_CHARGE_CURRENT -
+        (uint16_t)((uint32_t)(CHARGER_CHARGE_CURRENT - BATTERY_TAPER_MIN_CURRENT) *
+                   (charge - BATTERY_TAPER_START) / (100 - BATTERY_TAPER_START));
+#else
+    return CHARGER_CHARGE_CURRENT;
+#endif
+}
+
+/**
  * Charge current to program, as requested by the battery but never exceeding
- * the board limit.
+ * the board limit, tapered near full charge.
  */
 uint16_t battery_charge_current_ma(void) {
-    return MIN(battery_info.charging_current, CHARGER_CHARGE_CURRENT);
+    return MIN(battery_info.charging_current, battery_taper_current_ma());
 }
 
 /**

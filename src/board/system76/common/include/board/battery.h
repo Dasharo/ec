@@ -60,6 +60,24 @@
 #error "BATTERY_CHARGE_TEMP_RESUME must be below BATTERY_CHARGE_TEMP_MAX"
 #endif
 
+// Charge current taper near full. Above BATTERY_TAPER_START percent state of
+// charge, the charge current limit drops linearly from CHARGER_CHARGE_CURRENT
+// down to BATTERY_TAPER_MIN_CURRENT (mA) at 100%, to reduce stress on the pack
+// at high state of charge. The battery's own request still applies when lower.
+// Keep the minimum well above the pack's charge termination (taper) current,
+// typically C/20 to C/10, so the gauge does not detect full charge early. Set
+// BATTERY_TAPER_START to 100 to disable.
+#ifndef BATTERY_TAPER_START
+#define BATTERY_TAPER_START 80
+#endif
+#ifndef BATTERY_TAPER_MIN_CURRENT
+#define BATTERY_TAPER_MIN_CURRENT 512
+#endif
+
+#if BATTERY_TAPER_START > 100
+#error "BATTERY_TAPER_START must be at most 100"
+#endif
+
 #ifndef AC_ADAPTER_VOLTAGE
 #define AC_ADAPTER_VOLTAGE 19
 #endif
