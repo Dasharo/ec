@@ -61,7 +61,10 @@ bool battery_charge_temp_inhibited(void) {
     return temp_inhibit;
 }
 
-static bool battery_temp_valid(void) {
+/**
+ * Whether the battery reports a usable Temperature() reading.
+ */
+bool battery_temp_valid(void) {
     return battery_info.temp >= BATTERY_TEMP_VALID_MIN;
 }
 
@@ -77,20 +80,27 @@ static bool battery_temp_valid(void) {
  *
  * A reading below BATTERY_TEMP_VALID_MIN is treated as no reading and only the
  * alarm bit is used. Gate state changes are logged at WARN level so they show
- * up in release builds.
+ * up in release builds. The EC log is only a small ring buffer read live, so
+ * an invalid reading is logged again every BATTERY_TEMP_INVALID_LOG_EVENTS
+ * battery events for as long as it persists while a battery is connected.
  */
 static void battery_temp_gate_update(void) {
     static bool temp_valid_last = true;
+    static uint8_t invalid_events = 0;
     bool temp_valid = battery_temp_valid();
     bool alarm = (battery_info.status & BATTERY_OVER_TEMP_ALARM) != 0;
+    // Do not warn when no battery is connected, the reading is then always 0
+    bool present = (battery_info.status & BATTERY_INITIALIZED) != 0;
 
-    if (temp_valid != temp_valid_last) {
-        if (temp_valid)
-            WARN("Battery temperature valid: %d dK\n", battery_info.temp);
-        else
+    if (!temp_valid) {
+        if (present && (temp_valid_last || ++invalid_events >= BATTERY_TEMP_INVALID_LOG_EVENTS)) {
             WARN("Battery temperature invalid: %d dK, using alarm only\n", battery_info.temp);
-        temp_valid_last = temp_valid;
+            invalid_events = 0;
+        }
+    } else if (!temp_valid_last) {
+        WARN("Battery temperature valid: %d dK\n", battery_info.temp);
     }
+    temp_valid_last = temp_valid;
 
     if (!temp_inhibit) {
         if (alarm || (temp_valid && battery_info.temp >= BATTERY_CHARGE_TEMP_MAX)) {

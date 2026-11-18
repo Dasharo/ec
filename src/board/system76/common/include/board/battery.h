@@ -55,6 +55,12 @@
 // reading at or above BATTERY_CHARGE_TEMP_MAX, however implausible (e.g. a
 // shorted thermistor), inhibits charging.
 #define BATTERY_TEMP_VALID_MIN BATTERY_TEMP_DK(-40)
+// While the reading is invalid, repeat the warning every this many battery
+// events (one per second), so it is seen by anyone watching the EC console
+// without flooding its 256-byte buffer.
+#ifndef BATTERY_TEMP_INVALID_LOG_EVENTS
+#define BATTERY_TEMP_INVALID_LOG_EVENTS 60
+#endif
 
 #if BATTERY_CHARGE_TEMP_RESUME >= BATTERY_CHARGE_TEMP_MAX
 #error "BATTERY_CHARGE_TEMP_RESUME must be below BATTERY_CHARGE_TEMP_MAX"
@@ -112,6 +118,7 @@ bool battery_set_end_threshold(uint8_t value);
 
 bool battery_requests_charge(void);
 bool battery_charge_temp_inhibited(void);
+bool battery_temp_valid(void);
 uint16_t battery_charge_current_ma(void);
 uint16_t battery_charge_voltage_mv(void);
 
