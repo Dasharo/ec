@@ -12,6 +12,9 @@ CONFIG_BUS_ESPI=y
 # Enable firmware security
 CONFIG_SECURITY=n
 
+# Enable disabling ME via an EC command
+CONFIG_EC_FDOPSS_OVERRIDE=y
+
 # Use S0ix
 CFLAGS+=-DUSE_S0IX=1
 # Apply PMC hack for S0ix
